@@ -272,7 +272,7 @@ export default function MapView({
               mouseout: () => onLocationHover(null),
             }}
           >
-            <Popup closeButton={true} autoPan={false}>
+            <Popup closeButton={true} autoPan={false} offset={[0, -23]}>
               <Link 
                 href={`/location/${location.id}`}
                 target="_blank"
