@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useMemo } from "react"
 import dynamic from "next/dynamic"
+import { usePathname } from "next/navigation"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import type { LocationData } from "@/lib/types"
 import { CATEGORIES } from "@/lib/constants"
@@ -19,13 +20,33 @@ const MapView = dynamic(() => import("@/components/map-view"), {
 
 interface ExploreClientProps {
   initialLocations: LocationData[]
+  initialSelectedLocationId?: string
 }
 
-export default function ExploreClient({ initialLocations }: ExploreClientProps) {
+export default function ExploreClient({ initialLocations, initialSelectedLocationId }: ExploreClientProps) {
+  const pathname = usePathname()
   const [view, setView] = useState<"map" | "list">("map")
   const [filteredLocations, setFilteredLocations] = useState<LocationData[]>(initialLocations)
-  const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null)
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(initialSelectedLocationId || null)
   const isMobile = useMediaQuery("(max-width: 768px)")
+
+  // Memoize the selected location to prevent unnecessary re-renders
+  const selectedLocation = useMemo(() => {
+    if (!selectedLocationId) return null;
+    return initialLocations.find(loc => loc.id === selectedLocationId) || null;
+  }, [selectedLocationId, initialLocations]);
+  
+  // Update URL when selected location changes - using a minimal approach
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const basePath = '/explore';
+    const newPath = selectedLocationId ? `${basePath}/${selectedLocationId}` : basePath;
+    
+    if (window.location.pathname !== newPath) {
+      window.history.pushState(null, '', newPath);
+    }
+  }, [selectedLocationId]);
 
   const handleFilterChange = (selectedCategories: string[]) => {
     if (selectedCategories.length === 0) {
@@ -40,14 +61,15 @@ export default function ExploreClient({ initialLocations }: ExploreClientProps) 
   }
 
   const handleLocationSelect = (location: LocationData) => {
-    setSelectedLocation(location)
+    setSelectedLocationId(location.id);
   }
 
   const handleCloseDetail = () => {
-    setSelectedLocation(null)
+    setSelectedLocationId(null);
   }
 
-  const renderDetailView = () => (
+  // Memoize these components to prevent unnecessary re-renders
+  const detailView = useMemo(() => (
     <div
       className={`${
         isMobile && !selectedLocation ? "hidden" : "flex"
@@ -63,9 +85,9 @@ export default function ExploreClient({ initialLocations }: ExploreClientProps) 
         <EmptyState />
       )}
     </div>
-  )
+  ), [selectedLocation, isMobile]);
 
-  const renderExploreView = () => (
+  const exploreView = useMemo(() => (
     <div
       className={`${
         isMobile && selectedLocation ? "hidden" : "flex"
@@ -95,12 +117,12 @@ export default function ExploreClient({ initialLocations }: ExploreClientProps) 
         )}
       </div>
     </div>
-  )
+  ), [filteredLocations, view, selectedLocation, isMobile]);
 
   return (
     <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-      {renderDetailView()}
-      {renderExploreView()}
+      {detailView}
+      {exploreView}
     </div>
   )
 }
