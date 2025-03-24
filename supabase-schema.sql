@@ -1,4 +1,5 @@
 -- Drop existing tables if they exist (to start fresh)
+DROP TABLE IF EXISTS user_favorites;
 DROP TABLE IF EXISTS locations;
 DROP TABLE IF EXISTS categories;
 
@@ -17,6 +18,15 @@ CREATE TABLE locations (
   latitude FLOAT NOT NULL,
   longitude FLOAT NOT NULL,
   images JSONB NOT NULL
+);
+
+-- Create user favorites table to store user's favorite locations
+CREATE TABLE user_favorites (
+  id SERIAL PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  location_id TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, location_id)
 );
 
 -- Insert predefined categories
@@ -52,7 +62,7 @@ VALUES
     'activity',
     35.6595,
     139.7004,
-    '["https://images.unsplash.com/photo-1542931287-023b922fa89b"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'ueno-park',
@@ -61,7 +71,7 @@ VALUES
     'nature',
     35.7155,
     139.7737,
-    '["https://images.unsplash.com/photo-1542931287-023b922fa89b"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'senso-ji',
@@ -70,7 +80,7 @@ VALUES
     'shrine',
     35.7148,
     139.7967,
-    '["https://images.unsplash.com/photo-1591298718759-0e2325778551"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'tokyo-skytree',
@@ -79,7 +89,7 @@ VALUES
     'activity',
     35.7101,
     139.8107,
-    '["https://images.unsplash.com/photo-1529138175548-9d6a28535548"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'ginza',
@@ -88,7 +98,7 @@ VALUES
     'shopping',
     35.6714,
     139.7671,
-    '["https://images.unsplash.com/photo-1590874103328-eac38a683ce7"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'shinjuku-gyoen',
@@ -97,7 +107,7 @@ VALUES
     'nature',
     35.6852,
     139.7101,
-    '["https://images.unsplash.com/photo-1547185774-88ff7d51c54c"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'akihabara',
@@ -106,7 +116,7 @@ VALUES
     'activity',
     35.7023,
     139.7745,
-    '["https://images.unsplash.com/photo-1527864550417-7fd91fc51a46"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'harajuku',
@@ -115,7 +125,7 @@ VALUES
     'shopping',
     35.6702,
     139.7027,
-    '["https://images.unsplash.com/photo-1518675691542-30559677e55f"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'tsukiji-outer-market',
@@ -124,7 +134,7 @@ VALUES
     'food',
     35.6661,
     139.7706,
-    '["https://images.unsplash.com/photo-1594278444927-8959b9815f2b"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'tokyo-national-museum',
@@ -133,7 +143,7 @@ VALUES
     'activity',
     35.7187,
     139.7764,
-    '["https://images.unsplash.com/photo-1615896997567-897555895857"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'yoyogi-park',
@@ -142,7 +152,7 @@ VALUES
     'nature',
     35.6724,
     139.6944,
-    '["https://images.unsplash.com/photo-1574151265552-598e797b4019"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'teamlab-planets',
@@ -151,7 +161,7 @@ VALUES
     'activity',
     35.6486,
     139.7839,
-    '["https://images.unsplash.com/photo-1621618725598-b29b95b4f557"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'ghibli-museum',
@@ -160,7 +170,7 @@ VALUES
     'museum',
     35.6962,
     139.5703,
-    '["https://example.com/ghibli-museum.jpg"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'national-museum-nature-science',
@@ -169,7 +179,7 @@ VALUES
     'museum',
     35.7175,
     139.7753,
-    '["https://example.com/nature-science-museum.jpg"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'koishikawa-korakuen-garden',
@@ -178,7 +188,7 @@ VALUES
     'garden',
     35.7052,
     139.7504,
-    '["https://example.com/koishikawa-garden.jpg"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'hamarikyu-gardens',
@@ -187,7 +197,7 @@ VALUES
     'garden',
     35.6605,
     139.7626,
-    '["https://example.com/hamarikyu-garden.jpg"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'kabuki-za-theatre',
@@ -196,7 +206,7 @@ VALUES
     'theater',
     35.6702,
     139.7640,
-    '["https://example.com/kabuki-za.jpg"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'national-theatre',
@@ -205,7 +215,7 @@ VALUES
     'theater',
     35.6912,
     139.7448,
-    '["https://example.com/national-theater.jpg"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'roppongi',
@@ -214,7 +224,7 @@ VALUES
     'nightlife',
     35.6627,
     139.7304,
-    '["https://example.com/roppongi-nightlife.jpg"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'golden-gai',
@@ -223,7 +233,7 @@ VALUES
     'nightlife',
     35.6935,
     139.7197,
-    '["https://example.com/golden-gai.jpg"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'inokashira-park',
@@ -232,7 +242,7 @@ VALUES
     'park',
     35.7019,
     139.5669,
-    '["https://example.com/inokashira-park.jpg"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   ),
   (
     'showa-memorial-park',
@@ -241,5 +251,5 @@ VALUES
     'park',
     35.7004,
     139.4172,
-    '["https://example.com/showa-memorial-park.jpg"]'
+    '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   );

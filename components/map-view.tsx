@@ -8,6 +8,90 @@ import "leaflet/dist/leaflet.css"
 import { MAP_CONFIG } from "@/lib/constants"
 import { markerIcon, highlightedMarkerIcon } from "@/components/map/marker-icon"
 import type { MapViewProps } from "@/lib/types"
+import { XMarkIcon, HeartIcon as HeartOutline } from "@heroicons/react/24/outline"
+import { HeartIcon as HeartSolid } from "@heroicons/react/24/solid"
+import { toggleFavorite, getUserFavorites } from "@/lib/supabase/favorites"
+import { createClient } from "@/lib/supabase/client"
+
+// Custom styles for Leaflet popups - we'll add this to override default Leaflet styles
+const customPopupStyles = `
+  .leaflet-popup-content-wrapper {
+    padding: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+    width: 280px !important;
+  }
+  .leaflet-popup-content {
+    margin: 0;
+    width: 100% !important;
+  }
+  .leaflet-popup-tip {
+    display: none;
+  }
+  .leaflet-popup-close-button {
+    display: none;
+  }
+  .airbnb-popup-close {
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    background: #FFFFFF;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  .airbnb-popup-heart {
+    position: absolute;
+    left: 8px;
+    top: 8px;
+    background: #FFFFFF;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  .airbnb-popup-content {
+    width: 100%;
+  }
+  .airbnb-popup-image-container {
+    position: relative;
+    width: 100%;
+    height: 180px;
+  }
+  .airbnb-popup-details {
+    padding: 12px;
+  }
+  .airbnb-popup-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 1px;
+    color: #222;
+  }
+  .airbnb-popup-description {
+    font-size: 14px;
+    color: #717171;
+    margin-bottom: 2px;
+    line-height: 1.2;
+  }
+  .airbnb-popup-category {
+    display: inline-block;
+    font-size: 14px;
+    font-weight: 400;
+    color: #717171;
+  }
+`;
 
 // Component to handle viewport changes and update visible locations
 function ViewportHandler({ 
@@ -38,6 +122,92 @@ function ViewportHandler({
   return null
 }
 
+// Custom popup component with Airbnb styling
+function AirbnbStylePopup({ location }: { location: MapViewProps['locations'][0] }) {
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const supabase = createClient();
+
+  useEffect(() => {
+    // Check if user is logged in
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsLoggedIn(!!user);
+      
+      if (user) {
+        // Check if this location is favorited
+        try {
+          const { data } = await supabase
+            .from("user_favorites")
+            .select("id")
+            .eq("user_id", user.id)
+            .eq("location_id", location.id)
+            .single();
+          
+          setIsFavorited(!!data);
+        } catch (error) {
+          // If error, assume not favorited
+          setIsFavorited(false);
+        }
+      }
+    };
+    
+    checkAuth();
+  }, [location.id, supabase]);
+
+  const handleHeartClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!isLoggedIn) {
+      // Redirect to login if not logged in
+      window.open('/login', '_blank');
+      return;
+    }
+    
+    if (isLoading) return;
+    
+    setIsLoading(true);
+    try {
+      const newStatus = await toggleFavorite(location.id);
+      setIsFavorited(newStatus);
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="airbnb-popup-content">
+      <div className="airbnb-popup-image-container">
+        <Image
+          src={location.images[0] || "/placeholder.svg"}
+          alt={location.name}
+          fill
+          className="object-cover"
+        />
+        <div 
+          className="airbnb-popup-heart" 
+          onClick={handleHeartClick}
+          title={isLoggedIn ? (isFavorited ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}
+        >
+          {isFavorited ? 
+            <HeartSolid className="w-5 h-5 text-red-500" /> : 
+            <HeartOutline className="w-5 h-5 text-gray-700" />
+          }
+        </div>
+      </div>
+      <div className="airbnb-popup-details">
+        <h3 className="airbnb-popup-title">{location.name}</h3>
+        <p className="airbnb-popup-description line-clamp-2">{location.description}</p>
+        <div className="airbnb-popup-category">{location.category}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function MapView({ 
   locations, 
   onLocationHover, 
@@ -48,7 +218,27 @@ export default function MapView({
 
   useEffect(() => {
     setIsMounted(true)
+    
+    // Add custom styles to the document head
+    const styleEl = document.createElement('style');
+    styleEl.textContent = customPopupStyles;
+    document.head.appendChild(styleEl);
+    
+    return () => {
+      styleEl.remove();
+    }
   }, [])
+
+  const handleClosePopup = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Find and close the Leaflet popup by simulating a click on the default close button
+    const closeButton = document.querySelector('.leaflet-popup-close-button') as HTMLElement;
+    if (closeButton) {
+      closeButton.click();
+    }
+  };
 
   if (!isMounted) {
     return <div className="h-full w-full bg-gray-100 flex items-center justify-center">Loading map...</div>
@@ -78,26 +268,22 @@ export default function MapView({
               mouseout: () => onLocationHover(null),
             }}
           >
-            <Popup>
-              <Link 
-                href={`/location/${location.id}`}
-                target="_blank"
-                className="block w-48"
-              >
-                <div className="relative h-24 mb-2">
-                  <Image
-                    src={location.images[0] || "/placeholder.svg"}
-                    alt={location.name}
-                    fill
-                    className="object-cover rounded"
-                  />
+            <Popup closeButton={true}>
+              <div className="relative">
+                <div 
+                  className="airbnb-popup-close"
+                  onClick={handleClosePopup}
+                >
+                  <XMarkIcon className="w-5 h-5 text-gray-700" />
                 </div>
-                <h3 className="font-medium text-sm">{location.name}</h3>
-                <p className="text-xs text-gray-600 line-clamp-1">{location.description}</p>
-                <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-800">
-                  {location.category}
-                </span>
-              </Link>
+                <Link 
+                  href={`/location/${location.id}`}
+                  target="_blank"
+                  className="block"
+                >
+                  <AirbnbStylePopup location={location} />
+                </Link>
+              </div>
             </Popup>
           </Marker>
         ))}

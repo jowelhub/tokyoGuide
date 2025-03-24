@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import type { LocationData } from "@/lib/types"
@@ -9,6 +9,8 @@ import CategoryFilter from "@/components/category-filter"
 import ListView from "@/components/list-view"
 import EmptyState from "@/components/empty-state"
 import { MapIcon, ListBulletIcon } from "@heroicons/react/24/outline"
+import { createClient } from "@/lib/supabase/client"
+import { getUserFavorites } from "@/lib/supabase/favorites"
 
 // Dynamically import MapView to avoid SSR issues with Leaflet
 const MapView = dynamic(() => import("@/components/map-view"), {
@@ -27,20 +29,66 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
   const [visibleLocations, setVisibleLocations] = useState<LocationData[]>(initialLocations)
   const isMobile = useMediaQuery("(max-width: 768px)")
   const [mobileView, setMobileView] = useState<"map" | "list">("map") // Default to map view on mobile
+  const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
+  const [userFavorites, setUserFavorites] = useState<string[]>([])
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+
+  // Check if user is logged in and get their favorites
+  useEffect(() => {
+    const checkAuthAndFavorites = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setIsLoggedIn(!!user);
+      
+      if (user) {
+        try {
+          const favorites = await getUserFavorites();
+          setUserFavorites(favorites);
+        } catch (error) {
+          console.error("Error fetching user favorites:", error);
+        }
+      }
+    };
+    
+    checkAuthAndFavorites();
+  }, []);
 
   const handleFilterChange = (selectedCategories: string[]) => {
-    if (selectedCategories.length === 0) {
-      setFilteredLocations(initialLocations)
-    } else {
+    let newFilteredLocations = initialLocations;
+    
+    // Apply category filter
+    if (selectedCategories.length > 0) {
       // Convert selected categories to lowercase for case-insensitive comparison
-      const lowerCaseSelectedCategories = selectedCategories.map(cat => cat.toLowerCase())
+      const lowerCaseSelectedCategories = selectedCategories.map(cat => cat.toLowerCase());
       
-      setFilteredLocations(
-        initialLocations.filter((location) => 
-          lowerCaseSelectedCategories.includes(location.category.toLowerCase())
-        )
-      )
+      newFilteredLocations = newFilteredLocations.filter((location) => 
+        lowerCaseSelectedCategories.includes(location.category.toLowerCase())
+      );
     }
+    
+    // Apply favorites filter if enabled
+    if (showOnlyFavorites && userFavorites.length > 0) {
+      newFilteredLocations = newFilteredLocations.filter((location) => 
+        userFavorites.includes(location.id)
+      );
+    }
+    
+    setFilteredLocations(newFilteredLocations);
+  }
+
+  const handleFavoritesFilterChange = (showFavorites: boolean) => {
+    setShowOnlyFavorites(showFavorites);
+    
+    let newFilteredLocations = initialLocations;
+    
+    // Apply favorites filter
+    if (showFavorites && userFavorites.length > 0) {
+      newFilteredLocations = newFilteredLocations.filter((location) => 
+        userFavorites.includes(location.id)
+      );
+    }
+    
+    setFilteredLocations(newFilteredLocations);
   }
 
   const handleLocationHover = (location: LocationData | null) => {
@@ -55,6 +103,16 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
     setMobileView(mobileView === "map" ? "list" : "map")
   }
 
+  // Filter visible locations based on favorites if needed
+  const getVisibleLocations = () => {
+    if (showOnlyFavorites && userFavorites.length > 0) {
+      return visibleLocations.filter(location => 
+        userFavorites.includes(location.id)
+      );
+    }
+    return visibleLocations;
+  }
+
   return (
     <div className="flex-1 flex flex-col h-full">
       {/* Mobile: Toggle between map and list views */}
@@ -67,7 +125,8 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
                 <div className="absolute top-2 left-2 z-10">
                   <CategoryFilter 
                     categories={categories.map(cat => cat.name)} 
-                    onFilterChange={handleFilterChange} 
+                    onFilterChange={handleFilterChange}
+                    onFavoritesFilterChange={handleFavoritesFilterChange}
                   />
                 </div>
                 <MapView
@@ -85,7 +144,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
                   className="flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-md border"
                 >
                   <ListBulletIcon className="h-5 w-5" />
-                  <span>Show list ({visibleLocations.length} places)</span>
+                  <span>Show list ({getVisibleLocations().length} places)</span>
                 </button>
               </div>
             </>
@@ -107,9 +166,9 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
                 </div>
                 
                 <div className="flex-1 overflow-y-auto">
-                  {visibleLocations.length > 0 ? (
+                  {getVisibleLocations().length > 0 ? (
                     <ListView
-                      locations={visibleLocations}
+                      locations={getVisibleLocations()}
                       onLocationHover={handleLocationHover}
                       hoveredLocation={hoveredLocation}
                     />
@@ -127,9 +186,9 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
           {/* Left side: Scrollable list of locations (60% on desktop) */}
           <div className="w-[60%] h-full flex flex-col overflow-hidden border-r">
             <div className="flex-1 overflow-y-auto">
-              {visibleLocations.length > 0 ? (
+              {getVisibleLocations().length > 0 ? (
                 <ListView
-                  locations={visibleLocations}
+                  locations={getVisibleLocations()}
                   onLocationHover={handleLocationHover}
                   hoveredLocation={hoveredLocation}
                 />
@@ -144,7 +203,8 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
             <div className="absolute top-2 left-2 z-10">
               <CategoryFilter 
                 categories={categories.map(cat => cat.name)} 
-                onFilterChange={handleFilterChange} 
+                onFilterChange={handleFilterChange}
+                onFavoritesFilterChange={handleFavoritesFilterChange}
               />
             </div>
             <MapView
