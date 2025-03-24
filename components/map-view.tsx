@@ -123,19 +123,26 @@ function ViewportHandler({
 }
 
 // Custom popup component with Airbnb styling
-function AirbnbStylePopup({ location }: { location: MapViewProps['locations'][0] }) {
+function AirbnbStylePopup({ 
+  location, 
+  refreshFavorites 
+}: { 
+  location: MapViewProps['locations'][0],
+  refreshFavorites?: () => Promise<void>
+}) {
   const [isFavorited, setIsFavorited] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const supabase = createClient();
 
+  // Check if user is logged in and get favorite status
   useEffect(() => {
-    // Check if user is logged in
     const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      setIsLoggedIn(!!user);
+      const loggedIn = !!user;
+      setIsLoggedIn(loggedIn);
       
-      if (user) {
+      if (loggedIn && user) {
         // Check if this location is favorited
         try {
           const { data } = await supabase
@@ -170,9 +177,28 @@ function AirbnbStylePopup({ location }: { location: MapViewProps['locations'][0]
     
     setIsLoading(true);
     try {
-      const newStatus = await toggleFavorite(location.id);
-      setIsFavorited(newStatus);
+      // First update local state for immediate feedback
+      const newFavoritedState = !isFavorited;
+      setIsFavorited(newFavoritedState);
+      
+      // Then update the database
+      await toggleFavorite(location.id);
+      
+      // Then refresh parent component state
+      if (refreshFavorites) {
+        await refreshFavorites();
+      }
+      
+      // Close popup if removing a favorite in favorites-only mode
+      if (!newFavoritedState && document.querySelector('[data-favorites-filter="true"]')) {
+        const closeButton = document.querySelector('.leaflet-popup-close-button') as HTMLElement;
+        if (closeButton) {
+          closeButton.click();
+        }
+      }
     } catch (error) {
+      // Revert local state if there was an error
+      setIsFavorited(!isFavorited);
       console.error("Error toggling favorite:", error);
     } finally {
       setIsLoading(false);
@@ -216,7 +242,8 @@ export default function MapView({
   locations, 
   onLocationHover, 
   hoveredLocation,
-  onViewportChange 
+  onViewportChange,
+  refreshFavorites
 }: MapViewProps) {
   const [isMounted, setIsMounted] = useState(false)
 
@@ -288,7 +315,7 @@ export default function MapView({
                 >
                   <XMarkIcon className="w-5 h-5 text-gray-700" />
                 </div>
-                <AirbnbStylePopup location={location} />
+                <AirbnbStylePopup location={location} refreshFavorites={refreshFavorites} />
               </Link>
             </Popup>
           </Marker>

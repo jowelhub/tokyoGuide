@@ -32,6 +32,34 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
   const [userFavorites, setUserFavorites] = useState<string[]>([])
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+
+  // Function to refresh favorites - will be passed to child components
+  const refreshFavorites = async () => {
+    if (isLoggedIn) {
+      try {
+        // Get the latest favorites from the database
+        const favorites = await getUserFavorites();
+        
+        // Update the favorites state
+        setUserFavorites(favorites);
+        
+        // If we're showing only favorites, we need to update the filtered locations immediately
+        if (showOnlyFavorites) {
+          // Apply both favorites and category filters
+          const newFilteredLocations = initialLocations.filter(location => 
+            favorites.includes(location.id) && 
+            (selectedCategories.length === 0 || selectedCategories.includes(location.category.toLowerCase()))
+          );
+          
+          // Update the filtered locations
+          setFilteredLocations(newFilteredLocations);
+        }
+      } catch (error) {
+        console.error("Error refreshing user favorites:", error);
+      }
+    }
+  };
 
   // Check if user is logged in and get their favorites
   useEffect(() => {
@@ -54,6 +82,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
   }, []);
 
   const handleFilterChange = (selectedCategories: string[]) => {
+    setSelectedCategories(selectedCategories);
     let newFilteredLocations = initialLocations;
     
     // Apply category filter
@@ -127,6 +156,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
                     categories={categories.map(cat => cat.name)} 
                     onFilterChange={handleFilterChange}
                     onFavoritesFilterChange={handleFavoritesFilterChange}
+                    refreshFavorites={refreshFavorites}
                   />
                 </div>
                 <MapView
@@ -134,6 +164,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
                   onLocationHover={handleLocationHover}
                   hoveredLocation={hoveredLocation}
                   onViewportChange={handleViewportChange}
+                  refreshFavorites={refreshFavorites}
                 />
               </div>
               
@@ -171,6 +202,8 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
                       locations={getVisibleLocations()}
                       onLocationHover={handleLocationHover}
                       hoveredLocation={hoveredLocation}
+                      refreshFavorites={refreshFavorites}
+                      userFavorites={userFavorites}
                     />
                   ) : (
                     <EmptyState message="No locations in current view. Try zooming out or changing filters." />
@@ -191,6 +224,8 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
                   locations={getVisibleLocations()}
                   onLocationHover={handleLocationHover}
                   hoveredLocation={hoveredLocation}
+                  refreshFavorites={refreshFavorites}
+                  userFavorites={userFavorites}
                 />
               ) : (
                 <EmptyState message="No locations in current view. Try zooming out or changing filters." />
@@ -205,6 +240,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
                 categories={categories.map(cat => cat.name)} 
                 onFilterChange={handleFilterChange}
                 onFavoritesFilterChange={handleFavoritesFilterChange}
+                refreshFavorites={refreshFavorites}
               />
             </div>
             <MapView
@@ -212,6 +248,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
               onLocationHover={handleLocationHover}
               hoveredLocation={hoveredLocation}
               onViewportChange={handleViewportChange}
+              refreshFavorites={refreshFavorites}
             />
           </div>
         </div>

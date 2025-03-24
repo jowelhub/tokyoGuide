@@ -10,12 +10,14 @@ interface CategoryFilterProps {
   categories: string[]
   onFilterChange: (selectedCategories: string[]) => void
   onFavoritesFilterChange?: (showOnlyFavorites: boolean) => void
+  refreshFavorites?: () => Promise<void>
 }
 
 export default function CategoryFilter({ 
   categories, 
   onFilterChange,
-  onFavoritesFilterChange 
+  onFavoritesFilterChange,
+  refreshFavorites
 }: CategoryFilterProps) {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [isOpen, setIsOpen] = useState(false)
@@ -61,17 +63,23 @@ export default function CategoryFilter({
     onFilterChange(newSelectedCategories)
   }
 
-  const toggleFavorites = () => {
+  const toggleFavorites = async () => {
     const newShowOnlyFavorites = !showOnlyFavorites;
     setShowOnlyFavorites(newShowOnlyFavorites);
     
+    // First refresh favorites to ensure we have the latest data
+    if (refreshFavorites && newShowOnlyFavorites) {
+      await refreshFavorites();
+    }
+    
+    // Then update the filter
     if (onFavoritesFilterChange) {
       onFavoritesFilterChange(newShowOnlyFavorites);
     }
   }
 
   return (
-    <div className="relative" ref={filterRef}>
+    <div className="relative" ref={filterRef} data-category-filter>
       <Button variant="outline" size="sm" className="gap-2" onClick={() => setIsOpen(!isOpen)}>
         <Filter className="h-4 w-4" />
         <span>Filters</span>
@@ -90,6 +98,7 @@ export default function CategoryFilter({
                 <div 
                   className="flex items-center px-2 py-1.5 hover:bg-gray-100 rounded cursor-pointer"
                   onClick={toggleFavorites}
+                  data-favorites-filter={showOnlyFavorites ? "true" : "false"}
                 >
                   <div className="w-4 h-4 mr-2 flex items-center justify-center">
                     {showOnlyFavorites && (
@@ -124,6 +133,8 @@ export default function CategoryFilter({
                 key={category}
                 className="flex items-center px-2 py-1.5 hover:bg-gray-100 rounded cursor-pointer"
                 onClick={() => toggleCategory(category)}
+                data-category={category}
+                data-active={selectedCategories.includes(category) ? "true" : "false"}
               >
                 <div className="w-4 h-4 mr-2 flex items-center justify-center">
                   {selectedCategories.includes(category) && (

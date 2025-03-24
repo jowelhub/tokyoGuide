@@ -14,45 +14,41 @@ interface ListViewProps {
   locations: LocationData[]
   onLocationHover: (location: LocationData | null) => void
   hoveredLocation: LocationData | null
+  refreshFavorites?: () => Promise<void>
+  userFavorites?: string[]
 }
 
-export default function ListView({ locations, onLocationHover, hoveredLocation }: ListViewProps) {
+export default function ListView({ 
+  locations, 
+  onLocationHover, 
+  hoveredLocation,
+  refreshFavorites,
+  userFavorites = []
+}: ListViewProps) {
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState<Record<string, boolean>>({});
   const supabase = createClient();
 
-  // Check if user is logged in and get their favorites
   useEffect(() => {
-    const checkAuthAndFavorites = async () => {
+    const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setIsLoggedIn(!!user);
-      
-      if (user) {
-        // Get all favorites for this user
-        try {
-          const { data } = await supabase
-            .from("user_favorites")
-            .select("location_id")
-            .eq("user_id", user.id);
-          
-          if (data) {
-            const favoritesMap: Record<string, boolean> = {};
-            data.forEach(fav => {
-              favoritesMap[fav.location_id] = true;
-            });
-            setFavorites(favoritesMap);
-          }
-        } catch (error) {
-          console.error("Error fetching favorites:", error);
-        }
-      }
     };
     
-    checkAuthAndFavorites();
+    checkAuth();
   }, [supabase]);
 
-  // Add custom styles for the heart icon
+  useEffect(() => {
+    if (userFavorites.length > 0) {
+      const favoritesMap: Record<string, boolean> = {};
+      userFavorites.forEach(locationId => {
+        favoritesMap[locationId] = true;
+      });
+      setFavorites(favoritesMap);
+    }
+  }, [userFavorites]);
+
   useEffect(() => {
     const styleEl = document.createElement('style');
     styleEl.textContent = `
@@ -94,9 +90,20 @@ export default function ListView({ locations, onLocationHover, hoveredLocation }
     setIsLoading(prev => ({ ...prev, [locationId]: true }));
     
     try {
-      const newStatus = await toggleFavorite(locationId);
-      setFavorites(prev => ({ ...prev, [locationId]: newStatus }));
+      // First update local state for immediate feedback
+      const newFavoritedState = !favorites[locationId];
+      setFavorites(prev => ({ ...prev, [locationId]: newFavoritedState }));
+      
+      // Then update the database
+      await toggleFavorite(locationId);
+      
+      // Then refresh parent component state
+      if (refreshFavorites) {
+        await refreshFavorites();
+      }
     } catch (error) {
+      // Revert local state if there was an error
+      setFavorites(prev => ({ ...prev, [locationId]: !prev[locationId] }));
       console.error("Error toggling favorite:", error);
     } finally {
       setIsLoading(prev => ({ ...prev, [locationId]: false }));

@@ -98,7 +98,7 @@ export default function Header() {
     <header className="border-b">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <Link href="/" className="text-xl font-bold flex items-center gap-2 z-10">
-          東京 Guide
+          Tokyo Guide
         </Link>
         
         {/* Desktop Navigation */}

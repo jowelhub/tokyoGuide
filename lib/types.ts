@@ -16,6 +16,7 @@ export interface ListViewProps {
   locations: LocationData[]
   onLocationHover: (location: LocationData | null) => void
   hoveredLocation: LocationData | null
+  refreshFavorites?: () => Promise<void>
 }
 
 export interface MapViewProps {
@@ -23,4 +24,5 @@ export interface MapViewProps {
   onLocationHover: (location: LocationData | null) => void
   hoveredLocation: LocationData | null
   onViewportChange: (locationsInViewport: LocationData[]) => void
+  refreshFavorites?: () => Promise<void>
 }
