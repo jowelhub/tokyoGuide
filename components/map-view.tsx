@@ -199,10 +199,14 @@ function AirbnbStylePopup({ location }: { location: MapViewProps['locations'][0]
           }
         </div>
       </div>
-      <div className="airbnb-popup-details">
-        <h3 className="airbnb-popup-title">{location.name}</h3>
-        <p className="airbnb-popup-description line-clamp-2">{location.description}</p>
-        <div className="airbnb-popup-category">{location.category}</div>
+      <div className="p-3">
+        <h3 className="font-medium text-lg truncate">{location.name}</h3>
+        <p className="text-sm text-gray-600 line-clamp-2 mt-1">{location.description}</p>
+        <div className="mt-2">
+          <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-800">
+            {location.category}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -269,21 +273,23 @@ export default function MapView({
             }}
           >
             <Popup closeButton={true} autoPan={false}>
-              <div className="relative">
+              <Link 
+                href={`/location/${location.id}`}
+                target="_blank"
+                className="block relative"
+              >
                 <div 
                   className="airbnb-popup-close"
-                  onClick={handleClosePopup}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleClosePopup(e);
+                  }}
                 >
                   <XMarkIcon className="w-5 h-5 text-gray-700" />
                 </div>
-                <Link 
-                  href={`/location/${location.id}`}
-                  target="_blank"
-                  className="block"
-                >
-                  <AirbnbStylePopup location={location} />
-                </Link>
-              </div>
+                <AirbnbStylePopup location={location} />
+              </Link>
             </Popup>
           </Marker>
         ))}
