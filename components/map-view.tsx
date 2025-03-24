@@ -252,6 +252,7 @@ export default function MapView({
         scrollWheelZoom={true}
         style={{ height: "100%", width: "100%" }}
         zoomControl={false}
+        closePopupOnClick={false}
       >
         <ZoomControl position="topright" />
         <TileLayer
@@ -268,7 +269,7 @@ export default function MapView({
               mouseout: () => onLocationHover(null),
             }}
           >
-            <Popup closeButton={true}>
+            <Popup closeButton={true} autoPan={false}>
               <div className="relative">
                 <div 
                   className="airbnb-popup-close"
