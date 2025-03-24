@@ -56,5 +56,5 @@ VALUES
     'nature',
     35.7155,
     139.7737,
-    '["https://images.unsplash.com/photo-1557862921-37829c7c0956"]'
+    '["https://images.unsplash.com/photo-1542931287-023b922fa89b"]'
   );
