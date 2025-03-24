@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Filter, Heart } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
@@ -21,6 +21,7 @@ export default function CategoryFilter({
   const [isOpen, setIsOpen] = useState(false)
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const filterRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -31,6 +32,25 @@ export default function CategoryFilter({
     
     checkAuth();
   }, []);
+
+  // Add click outside handler to close the filter panel
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    // Add event listener when the filter is open
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    // Clean up the event listener
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen]);
 
   const toggleCategory = (category: string) => {
     const newSelectedCategories = selectedCategories.includes(category)
@@ -51,7 +71,7 @@ export default function CategoryFilter({
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={filterRef}>
       <Button variant="outline" size="sm" className="gap-2" onClick={() => setIsOpen(!isOpen)}>
         <Filter className="h-4 w-4" />
         <span>Filters</span>
