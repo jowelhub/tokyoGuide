@@ -104,7 +104,7 @@ export default function ListView({ locations, onLocationHover, hoveredLocation }
   };
 
   return (
-    <div className="h-full overflow-y-auto" style={{ maxHeight: "calc(100vh - 120px)" }}>
+    <div className="h-full overflow-y-auto" style={{ maxHeight: "calc(100vh - 70px)" }}>
       <div className="p-4">
         {/* Responsive grid layout: 1 column on mobile, 2 on small screens, max 3 on larger screens */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">

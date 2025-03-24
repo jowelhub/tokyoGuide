@@ -185,7 +185,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
         <div className="flex-1 flex flex-row overflow-hidden h-full">
           {/* Left side: Scrollable list of locations (60% on desktop) */}
           <div className="w-[60%] h-full flex flex-col overflow-hidden border-r">
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto h-screen">
               {getVisibleLocations().length > 0 ? (
                 <ListView
                   locations={getVisibleLocations()}
