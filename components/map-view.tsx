@@ -252,7 +252,6 @@ export default function MapView({
         scrollWheelZoom={true}
         style={{ height: "100%", width: "100%" }}
         zoomControl={false}
-        closePopupOnClick={false}
       >
         <ZoomControl position="topright" />
         <TileLayer
