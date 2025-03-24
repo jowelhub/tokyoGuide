@@ -78,24 +78,6 @@ export default async function LocationPage({ params }: { params: { slug: string 
               </div>
             </div>
           )}
-          
-          {/* Location on map */}
-          <div className="mb-8">
-            <h2 className="text-2xl font-semibold mb-4">Location</h2>
-            <div className="relative h-80 rounded-lg overflow-hidden border">
-              <iframe
-                width="100%"
-                height="100%"
-                frameBorder="0"
-                style={{ border: 0 }}
-                src={`https://www.google.com/maps/embed/v1/place?key=YOUR_API_KEY&q=${location.coordinates[0]},${location.coordinates[1]}`}
-                allowFullScreen
-              ></iframe>
-            </div>
-            <p className="mt-2 text-sm text-gray-500">
-              Note: You'll need to replace YOUR_API_KEY with a valid Google Maps API key or use another mapping solution.
-            </p>
-          </div>
         </div>
       </main>
     </div>
