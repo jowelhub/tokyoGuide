@@ -20,7 +20,7 @@ const customPopupStyles = `
     border-radius: 12px;
     overflow: hidden;
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
-    width: 280px !important;
+    width: 320px !important;
   }
   .leaflet-popup-content {
     margin: 0;
@@ -181,7 +181,7 @@ function AirbnbStylePopup({ location }: { location: MapViewProps['locations'][0]
 
   return (
     <div className="airbnb-popup-content">
-      <div className="airbnb-popup-image-container">
+      <div className="relative w-full h-0 pb-[56.25%]">
         <Image
           src={location.images[0] || "/placeholder.svg"}
           alt={location.name}
@@ -200,7 +200,7 @@ function AirbnbStylePopup({ location }: { location: MapViewProps['locations'][0]
         </div>
       </div>
       <div className="p-3">
-        <h3 className="font-medium text-lg truncate">{location.name}</h3>
+        <h3 className="font-medium text-lg truncate text-gray-900">{location.name}</h3>
         <p className="text-sm text-gray-600 line-clamp-2 mt-1">{location.description}</p>
         <div className="mt-2">
           <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-800">

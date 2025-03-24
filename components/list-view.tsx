@@ -134,7 +134,7 @@ export default function ListView({ locations, onLocationHover, hoveredLocation }
               </div>
 
               {/* Image container with consistent aspect ratio */}
-              <div className="relative w-full h-0 pb-[56.25%]"> {/* 16:9 aspect ratio */}
+              <div className="relative w-full h-0 pb-[75%]"> {/* 4:3 aspect ratio */}
                 <Image
                   src={location.images[0] || "/placeholder.svg"}
                   alt={location.name}
