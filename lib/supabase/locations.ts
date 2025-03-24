@@ -59,3 +59,39 @@ export async function getLocationById(id: string): Promise<LocationData | null> 
     images: Array.isArray(data.images) ? data.images : JSON.parse(data.images)
   };
 }
+
+export async function getLocationBySlug(slug: string): Promise<LocationData | null> {
+  const supabase = createClient();
+  
+  // Convert slug to name (replace hyphens with spaces and capitalize words)
+  const name = slug
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+  
+  const { data, error } = await supabase
+    .from("locations")
+    .select(`
+      *,
+      categories!inner (
+        name
+      )
+    `)
+    .ilike("name", name)
+    .single();
+  
+  if (error || !data) {
+    console.error("Error fetching location by slug:", error);
+    return null;
+  }
+  
+  // Transform the data to match our LocationData type
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    category: data.categories.name,
+    coordinates: [data.latitude, data.longitude] as [number, number],
+    images: Array.isArray(data.images) ? data.images : JSON.parse(data.images)
+  };
+}

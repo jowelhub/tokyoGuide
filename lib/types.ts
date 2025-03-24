@@ -19,8 +19,13 @@ export interface CategoryFilterProps {
 
 export interface ListViewProps {
   locations: LocationData[]
-  onLocationSelect: (location: LocationData) => void
-  selectedLocation: LocationData | null
+  onLocationHover: (location: LocationData | null) => void
+  hoveredLocation: LocationData | null
 }
 
-export interface MapViewProps extends ListViewProps {}
+export interface MapViewProps {
+  locations: LocationData[]
+  onLocationHover: (location: LocationData | null) => void
+  hoveredLocation: LocationData | null
+  onViewportChange: (locationsInViewport: LocationData[]) => void
+}

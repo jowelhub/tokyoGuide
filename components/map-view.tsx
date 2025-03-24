@@ -1,14 +1,52 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { MapContainer, TileLayer, Marker, Tooltip } from "react-leaflet"
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, ZoomControl } from "react-leaflet"
+import Link from "next/link"
+import Image from "next/image"
 import "leaflet/dist/leaflet.css"
 import { MAP_CONFIG } from "@/lib/constants"
-import { markerIcon } from "@/components/map/marker-icon"
-import { MapController } from "@/components/map/map-controller"
+import { markerIcon, highlightedMarkerIcon } from "@/components/map/marker-icon"
 import type { MapViewProps } from "@/lib/types"
 
-export default function MapView({ locations, onLocationSelect, selectedLocation }: MapViewProps) {
+// Helper function to generate slug from location name
+const generateSlug = (name: string) => name.toLowerCase().replace(/\s+/g, '-')
+
+// Component to handle viewport changes and update visible locations
+function ViewportHandler({ 
+  locations, 
+  onViewportChange 
+}: { 
+  locations: MapViewProps['locations'], 
+  onViewportChange: MapViewProps['onViewportChange'] 
+}) {
+  const map = useMapEvents({
+    moveend: () => updateVisibleLocations(),
+    zoomend: () => updateVisibleLocations(),
+  })
+
+  const updateVisibleLocations = () => {
+    const bounds = map.getBounds()
+    const visibleLocations = locations.filter(location => 
+      bounds.contains([location.coordinates[0], location.coordinates[1]])
+    )
+    onViewportChange(visibleLocations)
+  }
+
+  // Initialize visible locations on mount
+  useEffect(() => {
+    updateVisibleLocations()
+  }, [locations])
+
+  return null
+}
+
+export default function MapView({ 
+  locations, 
+  onLocationHover, 
+  hoveredLocation,
+  onViewportChange 
+}: MapViewProps) {
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
@@ -26,7 +64,9 @@ export default function MapView({ locations, onLocationSelect, selectedLocation 
         zoom={MAP_CONFIG.defaultZoom}
         scrollWheelZoom={true}
         style={{ height: "100%", width: "100%" }}
+        zoomControl={false}
       >
+        <ZoomControl position="topright" />
         <TileLayer
           attribution={MAP_CONFIG.attribution}
           url={MAP_CONFIG.tileLayerUrl}
@@ -35,23 +75,36 @@ export default function MapView({ locations, onLocationSelect, selectedLocation 
           <Marker
             key={location.id}
             position={location.coordinates}
-            icon={markerIcon}
+            icon={hoveredLocation?.id === location.id ? highlightedMarkerIcon : markerIcon}
             eventHandlers={{
-              click: () => onLocationSelect(location),
+              mouseover: () => onLocationHover(location),
+              mouseout: () => onLocationHover(null),
             }}
           >
-            <Tooltip 
-              direction="top"
-              className="custom-tooltip"
-              offset={[0, -8]}
-            >
-              <div className="bg-white px-2 py-1 rounded shadow-sm">
-                <span className="font-medium text-sm">{location.name}</span>
-              </div>
-            </Tooltip>
+            <Popup>
+              <Link 
+                href={`/location/${generateSlug(location.name)}`}
+                target="_blank"
+                className="block w-48"
+              >
+                <div className="relative h-24 mb-2">
+                  <Image
+                    src={location.images[0] || "/placeholder.svg"}
+                    alt={location.name}
+                    fill
+                    className="object-cover rounded"
+                  />
+                </div>
+                <h3 className="font-medium text-sm">{location.name}</h3>
+                <p className="text-xs text-gray-600 line-clamp-1">{location.description}</p>
+                <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-800">
+                  {location.category}
+                </span>
+              </Link>
+            </Popup>
           </Marker>
         ))}
-        <MapController selectedLocation={selectedLocation} />
+        <ViewportHandler locations={locations} onViewportChange={onViewportChange} />
       </MapContainer>
     </div>
   )
