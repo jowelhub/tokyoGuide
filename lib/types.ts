@@ -7,11 +7,6 @@ export interface LocationData {
   images: string[]
 }
 
-export interface ViewToggleProps {
-  view: "map" | "list"
-  onViewChange: (view: "map" | "list") => void
-}
-
 export interface CategoryFilterProps {
   categories: string[]
   onFilterChange: (selectedCategories: string[]) => void
