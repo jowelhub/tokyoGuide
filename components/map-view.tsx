@@ -9,9 +9,6 @@ import { MAP_CONFIG } from "@/lib/constants"
 import { markerIcon, highlightedMarkerIcon } from "@/components/map/marker-icon"
 import type { MapViewProps } from "@/lib/types"
 
-// Helper function to generate slug from location name
-const generateSlug = (name: string) => name.toLowerCase().replace(/\s+/g, '-')
-
 // Component to handle viewport changes and update visible locations
 function ViewportHandler({ 
   locations, 
@@ -83,7 +80,7 @@ export default function MapView({
           >
             <Popup>
               <Link 
-                href={`/location/${generateSlug(location.name)}`}
+                href={`/location/${location.id}`}
                 target="_blank"
                 className="block w-48"
               >

@@ -7,17 +7,6 @@ export const MAP_CONFIG = {
     '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
 } as const;
 
-// Categories configuration
-export const CATEGORIES = [
-  'Nature',
-  'Shrine',
-  'Activity',
-  'Food',
-  'Shopping',
-] as const;
-
-export type Category = (typeof CATEGORIES)[number];
-
 // Marker icon configuration
 export const MARKER_ICON_CONFIG = {
   iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',

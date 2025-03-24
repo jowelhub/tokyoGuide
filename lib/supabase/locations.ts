@@ -63,35 +63,35 @@ export async function getLocationById(id: string): Promise<LocationData | null> 
 export async function getLocationBySlug(slug: string): Promise<LocationData | null> {
   const supabase = createClient();
   
-  // Convert slug to name (replace hyphens with spaces and capitalize words)
-  const name = slug
-    .split('-')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-  
-  const { data, error } = await supabase
-    .from("locations")
-    .select(`
-      *,
-      categories!inner (
-        name
-      )
-    `)
-    .ilike("name", name)
-    .single();
-  
-  if (error || !data) {
-    console.error("Error fetching location by slug:", error);
+  try {
+    // Directly use the slug as the ID - much simpler and more reliable
+    const { data, error } = await supabase
+      .from("locations")
+      .select(`
+        *,
+        categories!inner (
+          name
+        )
+      `)
+      .eq("id", slug)
+      .single();
+    
+    if (error || !data) {
+      console.error("Error fetching location by slug/id:", error);
+      return null;
+    }
+    
+    // Transform the data to match our LocationData type
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description,
+      category: data.categories.name,
+      coordinates: [data.latitude, data.longitude] as [number, number],
+      images: Array.isArray(data.images) ? data.images : JSON.parse(data.images)
+    };
+  } catch (error) {
+    console.error("Exception in getLocationBySlug:", error);
     return null;
   }
-  
-  // Transform the data to match our LocationData type
-  return {
-    id: data.id,
-    name: data.name,
-    description: data.description,
-    category: data.categories.name,
-    coordinates: [data.latitude, data.longitude] as [number, number],
-    images: Array.isArray(data.images) ? data.images : JSON.parse(data.images)
-  };
 }

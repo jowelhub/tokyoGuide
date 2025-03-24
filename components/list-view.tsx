@@ -11,9 +11,6 @@ interface ListViewProps {
   hoveredLocation: LocationData | null
 }
 
-// Helper function to generate slug from location name
-const generateSlug = (name: string) => name.toLowerCase().replace(/\s+/g, '-')
-
 export default function ListView({ locations, onLocationHover, hoveredLocation }: ListViewProps) {
   return (
     <div className="h-full overflow-y-auto" style={{ maxHeight: "calc(100vh - 120px)" }}>
@@ -23,7 +20,7 @@ export default function ListView({ locations, onLocationHover, hoveredLocation }
           {locations.map((location) => (
             <Link
               key={location.id}
-              href={`/location/${generateSlug(location.name)}`}
+              href={`/location/${location.id}`}
               target="_blank"
               className={cn(
                 "block border rounded-lg overflow-hidden transition-all h-full",
