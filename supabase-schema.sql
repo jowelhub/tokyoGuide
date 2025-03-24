@@ -1,4 +1,4 @@
--- First, drop existing tables if they exist (to start fresh)
+-- Drop existing tables if they exist (to start fresh)
 DROP TABLE IF EXISTS locations;
 DROP TABLE IF EXISTS categories;
 
@@ -21,16 +21,21 @@ CREATE TABLE locations (
 
 -- Insert predefined categories
 INSERT INTO categories (id, name)
-VALUES 
+VALUES
   ('nature', 'Nature'),
   ('shrine', 'Shrine'),
   ('activity', 'Activity'),
   ('food', 'Food'),
-  ('shopping', 'Shopping');
+  ('shopping', 'Shopping'),
+  ('museum', 'Museum'),
+  ('park', 'Park'),
+  ('garden', 'Garden'),
+  ('theater', 'Theater'),
+  ('nightlife', 'Nightlife');
 
 -- Insert locations with references to categories
 INSERT INTO locations (id, name, description, category_id, latitude, longitude, images)
-VALUES 
+VALUES
   (
     'meiji-shrine',
     'Meiji Shrine',
@@ -103,7 +108,7 @@ VALUES
     139.7745,
     '["https://images.unsplash.com/photo-1527864550417-7fd91fc51a46"]'
   ),
-    (
+  (
     'harajuku',
     'Harajuku',
     'Known for its unique street style, colorful shops, and trendy cafes, especially along Takeshita Street.',
@@ -121,7 +126,7 @@ VALUES
     139.7706,
     '["https://images.unsplash.com/photo-1594278444927-8959b9815f2b"]'
   ),
-      (
+  (
     'tokyo-national-museum',
     'Tokyo National Museum',
     'One of Japan s oldest and largest museums, showcasing a vast collection of Japanese art and artifacts.',
@@ -130,16 +135,16 @@ VALUES
     139.7764,
     '["https://images.unsplash.com/photo-1615896997567-897555895857"]'
   ),
-    (
-      'yoyogi-park',
-      'Yoyogi Park',
-      'Large park next to Harajuku Station and Meiji Jingu, popular for events, picnics, and outdoor activities.',
-      'nature',
-      35.6724,
-      139.6944,
-      '["https://images.unsplash.com/photo-1574151265552-598e797b4019"]'
-    ),
-      (
+  (
+    'yoyogi-park',
+    'Yoyogi Park',
+    'Large park next to Harajuku Station and Meiji Jingu, popular for events, picnics, and outdoor activities.',
+    'nature',
+    35.6724,
+    139.6944,
+    '["https://images.unsplash.com/photo-1574151265552-598e797b4019"]'
+  ),
+  (
     'teamlab-planets',
     'teamLab Planets TOKYO',
     'Immersive digital art museum where visitors walk through interactive installations.',
@@ -147,4 +152,94 @@ VALUES
     35.6486,
     139.7839,
     '["https://images.unsplash.com/photo-1621618725598-b29b95b4f557"]'
+  ),
+  (
+    'ghibli-museum',
+    'Ghibli Museum',
+    'Animation and art museum showcasing the works of Studio Ghibli, known for films like ''Spirited Away''.',
+    'museum',
+    35.6962,
+    139.5703,
+    '["https://example.com/ghibli-museum.jpg"]'
+  ),
+  (
+    'national-museum-nature-science',
+    'National Museum of Nature and Science',
+    'Comprehensive museum exhibiting a wide range of specimens related to natural history and science and technology.',
+    'museum',
+    35.7175,
+    139.7753,
+    '["https://example.com/nature-science-museum.jpg"]'
+  ),
+  (
+    'koishikawa-korakuen-garden',
+    'Koishikawa Korakuen Garden',
+    'One of Tokyo''s oldest and best Japanese gardens, featuring ponds, stones, and paths that recreate famous landscapes.',
+    'garden',
+    35.7052,
+    139.7504,
+    '["https://example.com/koishikawa-garden.jpg"]'
+  ),
+  (
+    'hamarikyu-gardens',
+    'Hamarikyu Gardens',
+    'Beautiful landscape garden by Tokyo Bay, featuring a seawater pond that changes with the tides.',
+    'garden',
+    35.6605,
+    139.7626,
+    '["https://example.com/hamarikyu-garden.jpg"]'
+  ),
+  (
+    'kabuki-za-theatre',
+    'Kabuki-za Theatre',
+    'Main theater for Kabuki performances in Tokyo, showcasing traditional Japanese dance and drama.',
+    'theater',
+    35.6702,
+    139.7640,
+    '["https://example.com/kabuki-za.jpg"]'
+  ),
+  (
+    'national-theatre',
+    'National Theatre',
+    'Venue for performances of traditional Japanese performing arts, including Noh, Kabuki, and Bunraku.',
+    'theater',
+    35.6912,
+    139.7448,
+    '["https://example.com/national-theater.jpg"]'
+  ),
+  (
+    'roppongi',
+    'Roppongi',
+    'District known for its vibrant nightlife, with numerous bars, clubs, and restaurants that stay open late.',
+    'nightlife',
+    35.6627,
+    139.7304,
+    '["https://example.com/roppongi-nightlife.jpg"]'
+  ),
+  (
+    'golden-gai',
+    'Golden Gai',
+    'Network of narrow alleys with tiny bars, each with its own unique atmosphere and regular clientele.',
+    'nightlife',
+    35.6935,
+    139.7197,
+    '["https://example.com/golden-gai.jpg"]'
+  ),
+  (
+    'inokashira-park',
+    'Inokashira Park',
+    'Large park with a pond, walking paths, a zoo, and the Ghibli Museum located within its grounds.',
+    'park',
+    35.7019,
+    139.5669,
+    '["https://example.com/inokashira-park.jpg"]'
+  ),
+  (
+    'showa-memorial-park',
+    'Showa Memorial Park',
+    'Vast park with seasonal flowers, gardens, cycling paths, and open spaces for recreation.',
+    'park',
+    35.7004,
+    139.4172,
+    '["https://example.com/showa-memorial-park.jpg"]'
   );

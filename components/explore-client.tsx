@@ -4,7 +4,7 @@ import { useState } from "react"
 import dynamic from "next/dynamic"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import type { LocationData } from "@/lib/types"
-import { CATEGORIES } from "@/lib/constants"
+import type { CategoryData } from "@/lib/supabase/categories"
 import CategoryFilter from "@/components/category-filter"
 import ViewToggle from "@/components/view-toggle"
 import LocationDetail from "@/components/location-detail"
@@ -19,9 +19,10 @@ const MapView = dynamic(() => import("@/components/map-view"), {
 
 interface ExploreClientProps {
   initialLocations: LocationData[]
+  categories: CategoryData[]
 }
 
-export default function ExploreClient({ initialLocations }: ExploreClientProps) {
+export default function ExploreClient({ initialLocations, categories }: ExploreClientProps) {
   const [view, setView] = useState<"map" | "list">("map")
   const [filteredLocations, setFilteredLocations] = useState<LocationData[]>(initialLocations)
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null)
@@ -31,9 +32,12 @@ export default function ExploreClient({ initialLocations }: ExploreClientProps) 
     if (selectedCategories.length === 0) {
       setFilteredLocations(initialLocations)
     } else {
+      // Convert selected categories to lowercase for case-insensitive comparison
+      const lowerCaseSelectedCategories = selectedCategories.map(cat => cat.toLowerCase())
+      
       setFilteredLocations(
         initialLocations.filter((location) =>
-          selectedCategories.some((category) => location.category.toLowerCase() === category.toLowerCase())
+          lowerCaseSelectedCategories.includes(location.category.toLowerCase())
         )
       )
     }
@@ -73,7 +77,7 @@ export default function ExploreClient({ initialLocations }: ExploreClientProps) 
     >
       <div className="border-b flex-shrink-0 p-2 flex items-center justify-between">
         <CategoryFilter 
-          categories={Array.from(CATEGORIES)} 
+          categories={categories.map(cat => cat.name)} 
           onFilterChange={handleFilterChange} 
         />
         <ViewToggle view={view} onViewChange={setView} />

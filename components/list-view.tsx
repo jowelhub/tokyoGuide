@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import type { LocationData } from "@/lib/types"
-import { cn, getCategoryColor } from "@/lib/utils"
+import { cn } from "@/lib/utils"
 
 interface ListViewProps {
   locations: LocationData[]
@@ -35,12 +35,7 @@ export default function ListView({ locations, onLocationSelect, selectedLocation
                 <h3 className="font-medium text-lg truncate">{location.name}</h3>
                 <p className="text-sm text-gray-600 line-clamp-2">{location.description}</p>
                 <div className="mt-1">
-                  <span
-                    className={cn(
-                      "inline-block px-2 py-0.5 text-xs rounded-full",
-                      getCategoryColor(location.category)
-                    )}
-                  >
+                  <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-800">
                     {location.category}
                   </span>
                 </div>

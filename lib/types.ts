@@ -1,10 +1,8 @@
-import type { Category } from "./constants"
-
 export interface LocationData {
   id: string
   name: string
   description: string
-  category: Category
+  category: string
   coordinates: [number, number]
   images: string[]
 }
@@ -15,8 +13,8 @@ export interface ViewToggleProps {
 }
 
 export interface CategoryFilterProps {
-  categories: Category[]
-  onFilterChange: (selectedCategories: Category[]) => void
+  categories: string[]
+  onFilterChange: (selectedCategories: string[]) => void
 }
 
 export interface ListViewProps {
