@@ -8,7 +8,6 @@ export interface ItineraryDay {
 
 export interface Itinerary {
   id: number;
-  name: string;
   days: ItineraryDay[];
   created_at: string;
   updated_at: string;
@@ -18,11 +17,10 @@ export interface Itinerary {
  * Save a complete itinerary for the current user.
  * If the user already has an itinerary, it will update it instead.
  * 
- * @param name - The name of the itinerary
  * @param days - Array of itinerary days with locations
  * @returns The ID of the created or updated itinerary
  */
-export async function saveItinerary(name: string, days: ItineraryDay[]): Promise<number> {
+export async function saveItinerary(days: ItineraryDay[]): Promise<number> {
   const supabase = createClient();
   
   // Get current user
@@ -45,13 +43,13 @@ export async function saveItinerary(name: string, days: ItineraryDay[]): Promise
     
   // If user already has an itinerary, update it instead of creating a new one
   if (existingItineraries && existingItineraries.length > 0) {
-    return updateItinerary(existingItineraries[0].id, name, days);
+    return updateItinerary(existingItineraries[0].id, days);
   }
   
   // Create a new itinerary
   const { data: itinerary, error: itineraryError } = await supabase
     .from("user_itineraries")
-    .insert({ user_id: user.id, name })
+    .insert({ user_id: user.id })
     .select("id")
     .single();
   
@@ -268,11 +266,10 @@ export async function deleteItinerary(itineraryId: number): Promise<boolean> {
  * Update an existing itinerary with new data
  * 
  * @param itineraryId - The ID of the itinerary to update
- * @param name - The new name for the itinerary
  * @param days - The updated array of days and locations
  * @returns The ID of the updated itinerary
  */
-export async function updateItinerary(itineraryId: number, name: string, days: ItineraryDay[]): Promise<number> {
+export async function updateItinerary(itineraryId: number, days: ItineraryDay[]): Promise<number> {
   const supabase = createClient();
   
   // Get current user
@@ -295,11 +292,10 @@ export async function updateItinerary(itineraryId: number, name: string, days: I
     throw checkError;
   }
   
-  // Update the itinerary name and timestamp
+  // Update the itinerary timestamp
   const { error: updateError } = await supabase
     .from("user_itineraries")
     .update({ 
-      name, 
       updated_at: new Date().toISOString() 
     })
     .eq("id", itineraryId);

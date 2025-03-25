@@ -6,22 +6,15 @@ import {
   getUserItineraries, 
   getItinerary, 
   deleteItinerary, 
-  updateItinerary
+  updateItinerary,
+  type Itinerary as SupabaseItinerary,
+  type ItineraryDay
 } from "@/lib/supabase/itinerary"
 import type { LocationData } from "@/lib/types"
 import { useAuth } from "./use-auth"
 
-export interface ItineraryDay {
-  id: number;
-  locations: LocationData[];
-}
-
-export interface Itinerary {
-  id: number;
-  name: string;
-  days: ItineraryDay[];
-  created_at: string;
-  updated_at: string;
+export interface Itinerary extends SupabaseItinerary {
+  // No additional fields needed since we removed the name field
 }
 
 export function useItinerary() {
@@ -44,7 +37,7 @@ export function useItinerary() {
       setIsLoading(true)
       setError(null)
       const userItineraries = await getUserItineraries()
-      setItineraries(userItineraries)
+      setItineraries(userItineraries as Itinerary[])
       
       // If we have itineraries but no current one is set, load the most recent one
       if (userItineraries.length > 0 && !currentItinerary) {
@@ -69,7 +62,7 @@ export function useItinerary() {
       setIsLoading(true)
       setError(null)
       const loadedItinerary = await getItinerary(itineraryId)
-      setCurrentItinerary(loadedItinerary)
+      setCurrentItinerary(loadedItinerary as Itinerary)
       setDays(loadedItinerary.days)
     } catch (err) {
       console.error("Error loading itinerary:", err)
@@ -92,7 +85,7 @@ export function useItinerary() {
       
       if (currentItinerary) {
         // Update existing itinerary
-        await updateItinerary(currentItinerary.id, currentItinerary.name, days)
+        await updateItinerary(currentItinerary.id, days)
         
         // Update the current itinerary with the new days
         setCurrentItinerary(prev => prev ? { 
@@ -102,18 +95,17 @@ export function useItinerary() {
         } : null)
       } else if (itineraries.length > 0) {
         // Update the first itinerary if it exists
-        await updateItinerary(itineraries[0].id, itineraries[0].name, days)
+        await updateItinerary(itineraries[0].id, days)
         
         // Refresh the list of itineraries
         await fetchItineraries()
       } else {
-        // Create new itinerary with default name
-        const itineraryId = await saveItinerary("My Tokyo Itinerary", days)
+        // Create new itinerary
+        const itineraryId = await saveItinerary(days)
         
         // Set as current itinerary
         const newItinerary: Itinerary = {
           id: itineraryId,
-          name: "My Tokyo Itinerary",
           days,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -134,7 +126,7 @@ export function useItinerary() {
   }, [isLoggedIn, isSaving, currentItinerary, itineraries, days, fetchItineraries])
 
   // Save the current itinerary
-  const saveCurrentItinerary = useCallback(async (name: string): Promise<number | null> => {
+  const saveCurrentItinerary = useCallback(async (): Promise<number | null> => {
     if (!isLoggedIn) {
       return null
     }
@@ -147,10 +139,10 @@ export function useItinerary() {
       
       if (currentItinerary) {
         // Update existing itinerary
-        itineraryId = await updateItinerary(currentItinerary.id, name, days)
+        itineraryId = await updateItinerary(currentItinerary.id, days)
       } else {
         // Create new itinerary
-        itineraryId = await saveItinerary(name, days)
+        itineraryId = await saveItinerary(days)
       }
       
       // Refresh the list of itineraries
@@ -201,12 +193,12 @@ export function useItinerary() {
         try {
           setIsLoading(true);
           const userItineraries = await getUserItineraries();
-          setItineraries(userItineraries);
+          setItineraries(userItineraries as Itinerary[]);
           
           // If we have itineraries, load the most recent one
           if (userItineraries.length > 0) {
             const loadedItinerary = await getItinerary(userItineraries[0].id);
-            setCurrentItinerary(loadedItinerary);
+            setCurrentItinerary(loadedItinerary as Itinerary);
             setDays(loadedItinerary.days);
           }
         } catch (err) {

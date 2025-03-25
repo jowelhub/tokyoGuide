@@ -8,7 +8,6 @@ DROP TABLE IF EXISTS user_favorites;
 DROP TABLE IF EXISTS locations;
 DROP TABLE IF EXISTS categories;
 
-
 -- Create categories table
 CREATE TABLE categories (
   id TEXT PRIMARY KEY,
@@ -39,9 +38,9 @@ CREATE TABLE user_favorites (
 CREATE TABLE user_itineraries (
   id SERIAL PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id)
 );
 
 -- Create itinerary days table to store days within an itinerary
