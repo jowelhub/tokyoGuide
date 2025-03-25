@@ -11,9 +11,11 @@ export default async function ExplorePage() {
   ]);
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex flex-col h-screen">
       <Header />
-      <ExploreClient initialLocations={locations} categories={categories} />
+      <div className="flex-1 overflow-hidden">
+        <ExploreClient initialLocations={locations} categories={categories} />
+      </div>
     </div>
   )
 }

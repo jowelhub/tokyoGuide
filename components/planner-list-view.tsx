@@ -133,7 +133,7 @@ export default function PlannerListView({
   };
 
   return (
-    <div className="h-full overflow-y-auto" style={{ maxHeight: "calc(100vh - 70px)" }}>
+    <div className="h-full overflow-y-auto">
       <div className="p-4">
         {/* Single column layout for planner */}
         <div className="grid grid-cols-1 gap-4">

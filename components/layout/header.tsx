@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Home, Map, LogIn, UserPlus, Menu, X } from "lucide-react"
+import { Home, Map, LogIn, UserPlus, Menu, X, Calendar } from "lucide-react"
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 
@@ -105,6 +105,7 @@ export default function Header() {
         <nav className="hidden md:flex items-center gap-4">
           <NavLink href="/" icon={<Home className="w-5 h-5" />} label="Home" />
           <NavLink href="/explore" icon={<Map className="w-5 h-5" />} label="Explore" />
+          <NavLink href="/planner" icon={<Calendar className="w-5 h-5" />} label="Planner" />
           <AuthSection />
         </nav>
         
@@ -133,6 +134,12 @@ export default function Header() {
                   href="/explore" 
                   icon={<Map className="w-5 h-5" />} 
                   label="Explore" 
+                  onClick={() => setMobileMenuOpen(false)}
+                />
+                <NavLink 
+                  href="/planner" 
+                  icon={<Calendar className="w-5 h-5" />} 
+                  label="Planner" 
                   onClick={() => setMobileMenuOpen(false)}
                 />
                 <AuthSection isMobile />

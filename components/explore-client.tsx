@@ -5,15 +5,15 @@ import dynamic from "next/dynamic"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import type { LocationData } from "@/lib/types"
 import type { CategoryData } from "@/lib/supabase/categories"
-import CategoryFilter from "@/components/category-filter"
-import ListView from "@/components/list-view"
-import EmptyState from "@/components/empty-state"
+import CategoryFilter from "./category-filter"
+import ListView from "./explore-list-view"
+import EmptyState from "./empty-state"
 import { MapIcon, ListBulletIcon } from "@heroicons/react/24/outline"
 import { createClient } from "@/lib/supabase/client"
 import { getUserFavorites } from "@/lib/supabase/favorites"
 
 // Dynamically import MapView to avoid SSR issues with Leaflet
-const MapView = dynamic(() => import("@/components/map-view"), {
+const MapView = dynamic(() => import("./explore-map-view"), {
   ssr: false,
   loading: () => <div className="h-full w-full bg-gray-100 flex items-center justify-center">Loading map...</div>,
 })

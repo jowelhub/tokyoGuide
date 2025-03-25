@@ -5,7 +5,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMapEvents, ZoomControl } fro
 import Image from "next/image"
 import "leaflet/dist/leaflet.css"
 import { MAP_CONFIG } from "@/lib/constants"
-import { markerIcon, highlightedMarkerIcon } from "@/components/map/marker-icon"
+import { markerIcon, highlightedMarkerIcon } from "@/lib/marker-icon"
 import type { MapViewProps } from "@/lib/types"
 import { XMarkIcon, HeartIcon as HeartOutline, PlusIcon } from "@heroicons/react/24/outline"
 import { HeartIcon as HeartSolid } from "@heroicons/react/24/solid"

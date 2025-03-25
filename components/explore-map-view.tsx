@@ -145,14 +145,8 @@ function AirbnbStylePopup({
       if (loggedIn && user) {
         // Check if this location is favorited
         try {
-          const { data } = await supabase
-            .from("user_favorites")
-            .select("id")
-            .eq("user_id", user.id)
-            .eq("location_id", location.id)
-            .single();
-          
-          setIsFavorited(!!data);
+          const favorites = await getUserFavorites();
+          setIsFavorited(favorites.includes(location.id));
         } catch (error) {
           // If error, assume not favorited
           setIsFavorited(false);
