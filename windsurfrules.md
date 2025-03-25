@@ -34,7 +34,6 @@ Strict structure:
 /lib                  # Utilities, constants, helpers
 /styles               # Global CSS, Tailwind config
 /public               # Static assets
-/tests                # Optional: root or colocated
 ```
 
 ### Component Type Explanations
@@ -89,13 +88,11 @@ Strict structure:
 - **Validate/sanitize inputs:** Use Zod/Yup.
 - **Centralize authentication logic** in hooks/utilities.
 
-## ⚙️ Code Quality, Testing & Documentation
+## ⚙️ Code Quality & Documentation
 
 - **Naming:** Clear, descriptive names for functions and variables.
 - **Comments:** Focus on "why", not just "what".
-- **Unit Tests:**
-  - Use Jest + React Testing Library
-  - Place test files in `__tests__` folders near the tested code
+
 - **File Docs:** Every new/modified file should have a comment at the top.
 - **TypeScript:**
   - Explicit types for everything
@@ -116,7 +113,7 @@ Strict structure:
 - **CSS:**
   - Use Tailwind; fallback to CSS Modules with `@apply` if needed
 - **Images:** Use Next.js `Image` component with width/height.
-- **Accessibility:** Follow WCAG. Use semantic HTML, ARIA, and test with Lighthouse/Axe.
+
 
 ## ⚠️ Critical Rule: Avoiding Incomplete Refactors
 
@@ -136,7 +133,6 @@ Always:
 - [ ] Deleted unused files
 - [ ] Verified SSR/SSG for SEO-critical pages
 - [ ] Added documentation/comments
-- [ ] Passed linting and tests
 
 ## 🚩 Common Mistakes to Avoid
 

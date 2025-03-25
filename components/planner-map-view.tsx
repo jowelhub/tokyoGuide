@@ -7,8 +7,9 @@ import "leaflet/dist/leaflet.css"
 import { MAP_CONFIG } from "@/lib/constants"
 import { markerIcon, highlightedMarkerIcon } from "@/lib/marker-icon"
 import type { MapViewProps } from "@/lib/types"
-import { XMarkIcon, HeartIcon as HeartOutline, PlusIcon } from "@heroicons/react/24/outline"
+import { XMarkIcon, HeartIcon as HeartOutline } from "@heroicons/react/24/outline"
 import { HeartIcon as HeartSolid } from "@heroicons/react/24/solid"
+import { PlusIcon } from "@heroicons/react/24/solid"
 import { createClient } from "@/lib/supabase/client"
 import CategoryFilter from "@/components/category-filter"
 import { useAuth } from "@/hooks/use-auth"
@@ -207,7 +208,7 @@ function PlannerPopup({
           className="object-cover"
         />
         <div 
-          className="airbnb-popup-heart" 
+          className="airbnb-popup-heart absolute left-2 top-2 bg-white rounded-full w-8 h-8 flex items-center justify-center z-10 cursor-pointer shadow-sm" 
           onClick={handleHeartClick}
           title={isLoggedIn ? (isFavorited ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}
         >
@@ -217,20 +218,41 @@ function PlannerPopup({
           }
         </div>
         <div 
-          className="airbnb-popup-add" 
-          onClick={handleAddClick}
-          title="Add to itinerary"
+          className="absolute right-2 top-2 bg-white rounded-full w-8 h-8 flex items-center justify-center z-10 cursor-pointer shadow-sm" 
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Close the popup
+            const closeButton = document.querySelector('.leaflet-popup-close-button') as HTMLElement;
+            if (closeButton) {
+              closeButton.click();
+            }
+          }}
+          title="Close"
         >
-          <PlusIcon className="w-5 h-5 text-blue-500" />
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-700">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+          </svg>
         </div>
       </div>
-      <div className="p-3">
-        <h3 className="font-medium text-lg truncate text-gray-900">{location.name}</h3>
+      <div className="p-4">
+        <h3 className="font-medium text-xl text-gray-900">{location.name}</h3>
         <p className="text-sm text-gray-600 line-clamp-2 mt-1">{location.description}</p>
         <div className="mt-2">
           <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-800">
             {location.category}
           </span>
+        </div>
+        
+        <div className="mt-4">
+          <button 
+            onClick={handleAddClick}
+            className="w-full flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg transition-colors"
+          >
+            <PlusIcon className="w-5 h-5" />
+            <span>Add to itinerary</span>
+          </button>
         </div>
       </div>
     </div>

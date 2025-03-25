@@ -139,15 +139,6 @@ export default function PlannerListView({
                 }
               </div>
 
-              {/* Add to itinerary icon */}
-              <div 
-                className="location-card-add" 
-                onClick={(e) => handleAddClick(e, location)}
-                title="Add to itinerary"
-              >
-                <PlusIcon className="w-5 h-5 text-blue-500" />
-              </div>
-
               {/* Image container with consistent aspect ratio */}
               <div className="relative w-full h-0 pb-[75%]"> {/* 4:3 aspect ratio */}
                 <Image
@@ -158,13 +149,23 @@ export default function PlannerListView({
                 />
               </div>
               
-              <div className="p-3">
-                <h3 className="font-medium text-lg truncate">{location.name}</h3>
+              <div className="p-4">
+                <h3 className="font-medium text-xl text-gray-900">{location.name}</h3>
                 <p className="text-sm text-gray-600 line-clamp-2 mt-1">{location.description}</p>
                 <div className="mt-2">
                   <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-800">
                     {location.category}
                   </span>
+                </div>
+                
+                <div className="mt-4">
+                  <button 
+                    onClick={(e) => handleAddClick(e, location)}
+                    className="w-full flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg transition-colors"
+                  >
+                    <PlusIcon className="w-5 h-5" />
+                    <span>Add to itinerary</span>
+                  </button>
                 </div>
               </div>
             </div>

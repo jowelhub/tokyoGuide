@@ -82,12 +82,8 @@ export async function isLocationFavorited(locationId: string) {
     .single();
   
   if (error) {
-    // If error is not found, it means the location is not favorited
-    if (error.code === "PGRST116") {
-      return false;
-    }
     console.error("Error checking favorite status:", error);
-    return false;
+    return false; // Simplify: return false for *any* error
   }
   
   return !!data; // Return true if data exists

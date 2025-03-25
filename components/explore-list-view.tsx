@@ -41,32 +41,6 @@ export default function ListView({
     }
   }, [userFavorites]);
 
-  useEffect(() => {
-    const styleEl = document.createElement('style');
-    styleEl.textContent = `
-      .location-card-heart {
-        position: absolute;
-        left: 8px;
-        top: 8px;
-        background: #FFFFFF;
-        border-radius: 50%;
-        width: 32px;
-        height: 32px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 10;
-        cursor: pointer;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      }
-    `;
-    document.head.appendChild(styleEl);
-    
-    return () => {
-      styleEl.remove();
-    };
-  }, []);
-
   const handleHeartClick = async (e: React.MouseEvent, locationId: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -116,7 +90,7 @@ export default function ListView({
             >
               {/* Heart icon */}
               <div 
-                className="location-card-heart" 
+                className="absolute left-2 top-2 bg-white rounded-full w-8 h-8 flex items-center justify-center z-10 cursor-pointer shadow-sm" 
                 onClick={(e) => handleHeartClick(e, location.id)}
                 title={isLoggedIn ? (favorites[location.id] ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}
               >

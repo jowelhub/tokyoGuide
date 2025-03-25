@@ -76,8 +76,11 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
     
     // Apply category filter
     if (selectedCategories.length > 0) {
+      // Convert selected categories to lowercase for case-insensitive comparison
+      const lowerCaseSelectedCategories = selectedCategories.map(cat => cat.toLowerCase());
+      
       newFilteredLocations = newFilteredLocations.filter((location) => 
-        selectedCategories.includes(location.category)
+        lowerCaseSelectedCategories.includes(location.category.toLowerCase())
       );
     }
     
