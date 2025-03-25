@@ -10,8 +10,6 @@ import { markerIcon, highlightedMarkerIcon } from "@/lib/marker-icon"
 import type { MapViewProps } from "@/lib/types"
 import { XMarkIcon, HeartIcon as HeartOutline } from "@heroicons/react/24/outline"
 import { HeartIcon as HeartSolid } from "@heroicons/react/24/solid"
-import { toggleFavorite, getUserFavorites } from "@/lib/supabase/favorites"
-import { createClient } from "@/lib/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
 import { useFavorites } from "@/hooks/use-favorites"
 

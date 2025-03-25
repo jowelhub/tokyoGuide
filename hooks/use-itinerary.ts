@@ -1,269 +1,301 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { 
+  saveItinerary, 
+  getUserItineraries, 
+  getItinerary, 
+  deleteItinerary, 
+  updateItinerary
+} from "@/lib/supabase/itinerary"
 import type { LocationData } from "@/lib/types"
 import { useAuth } from "./use-auth"
 
-export type ItineraryDay = {
-  id: string
-  date: string
-  locations: LocationData[]
+export interface ItineraryDay {
+  id: number;
+  locations: LocationData[];
+}
+
+export interface Itinerary {
+  id: number;
+  name: string;
+  days: ItineraryDay[];
+  created_at: string;
+  updated_at: string;
 }
 
 export function useItinerary() {
-  const { user, isLoggedIn } = useAuth()
-  const [days, setDays] = useState<ItineraryDay[]>([])
+  const { isLoggedIn } = useAuth()
+  const [days, setDays] = useState<ItineraryDay[]>([{ id: 1, locations: [] }])
+  const [itineraries, setItineraries] = useState<Itinerary[]>([])
+  const [currentItinerary, setCurrentItinerary] = useState<Itinerary | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<Error | null>(null)
-  const supabase = createClient()
 
-  const fetchItinerary = useCallback(async (): Promise<void> => {
-    if (!isLoggedIn || !user) {
-      setDays([])
+  // Fetch all user itineraries
+  const fetchItineraries = useCallback(async (): Promise<void> => {
+    if (!isLoggedIn) {
+      setItineraries([])
       return
     }
 
     try {
       setIsLoading(true)
       setError(null)
-
-      // Fetch days
-      const { data: daysData, error: daysError } = await supabase
-        .from("itinerary_days")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("date")
-
-      if (daysError) throw new Error(daysError.message)
-
-      // Fetch locations for each day
-      const daysWithLocations = await Promise.all(
-        daysData.map(async (day) => {
-          const { data: locationsData, error: locationsError } = await supabase
-            .from("itinerary_locations")
-            .select("*, location:locations(*)")
-            .eq("day_id", day.id)
-            .order("order")
-
-          if (locationsError) throw new Error(locationsError.message)
-
-          // Transform location data
-          const locations = locationsData.map((item) => ({
-            id: item.location.id,
-            name: item.location.name,
-            description: item.location.description,
-            coordinates: [item.location.latitude, item.location.longitude] as [number, number],
-            category: item.location.category,
-            images: [] as string[], // We could fetch images if needed
-          }))
-
-          return {
-            id: day.id,
-            date: day.date,
-            locations,
-          }
-        })
-      )
-
-      setDays(daysWithLocations as ItineraryDay[])
+      const userItineraries = await getUserItineraries()
+      setItineraries(userItineraries)
+      
+      // If we have itineraries but no current one is set, load the most recent one
+      if (userItineraries.length > 0 && !currentItinerary) {
+        await loadItinerary(userItineraries[0].id)
+      }
     } catch (err) {
-      console.error("Error fetching itinerary:", err)
-      const errorObj = err instanceof Error ? err : new Error("Failed to fetch itinerary")
+      console.error("Error fetching itineraries:", err)
+      const errorObj = err instanceof Error ? err : new Error("Failed to fetch itineraries")
       setError(errorObj)
     } finally {
       setIsLoading(false)
     }
-  }, [isLoggedIn, user, supabase])
+  }, [isLoggedIn, currentItinerary])
 
+  // Load a specific itinerary
+  const loadItinerary = useCallback(async (itineraryId: number): Promise<void> => {
+    if (!isLoggedIn) {
+      return
+    }
+
+    try {
+      setIsLoading(true)
+      setError(null)
+      const loadedItinerary = await getItinerary(itineraryId)
+      setCurrentItinerary(loadedItinerary)
+      setDays(loadedItinerary.days)
+    } catch (err) {
+      console.error("Error loading itinerary:", err)
+      const errorObj = err instanceof Error ? err : new Error("Failed to load itinerary")
+      setError(errorObj)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [isLoggedIn])
+
+  // Auto-save the current itinerary whenever days change
+  const autoSave = useCallback(async (): Promise<void> => {
+    if (!isLoggedIn || isSaving) {
+      return
+    }
+
+    try {
+      setIsSaving(true)
+      setError(null)
+      
+      if (currentItinerary) {
+        // Update existing itinerary
+        await updateItinerary(currentItinerary.id, currentItinerary.name, days)
+        
+        // Update the current itinerary with the new days
+        setCurrentItinerary(prev => prev ? { 
+          ...prev, 
+          days, 
+          updated_at: new Date().toISOString() 
+        } : null)
+      } else if (itineraries.length > 0) {
+        // Update the first itinerary if it exists
+        await updateItinerary(itineraries[0].id, itineraries[0].name, days)
+        
+        // Refresh the list of itineraries
+        await fetchItineraries()
+      } else {
+        // Create new itinerary with default name
+        const itineraryId = await saveItinerary("My Tokyo Itinerary", days)
+        
+        // Set as current itinerary
+        const newItinerary: Itinerary = {
+          id: itineraryId,
+          name: "My Tokyo Itinerary",
+          days,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+        
+        setCurrentItinerary(newItinerary)
+        
+        // Refresh the list of itineraries
+        await fetchItineraries()
+      }
+    } catch (err) {
+      console.error("Error auto-saving itinerary:", err)
+      const errorObj = err instanceof Error ? err : new Error("Failed to auto-save itinerary")
+      setError(errorObj)
+    } finally {
+      setIsSaving(false)
+    }
+  }, [isLoggedIn, isSaving, currentItinerary, itineraries, days, fetchItineraries])
+
+  // Save the current itinerary
+  const saveCurrentItinerary = useCallback(async (name: string): Promise<number | null> => {
+    if (!isLoggedIn) {
+      return null
+    }
+
+    try {
+      setIsSaving(true)
+      setError(null)
+      
+      let itineraryId: number;
+      
+      if (currentItinerary) {
+        // Update existing itinerary
+        itineraryId = await updateItinerary(currentItinerary.id, name, days)
+      } else {
+        // Create new itinerary
+        itineraryId = await saveItinerary(name, days)
+      }
+      
+      // Refresh the list of itineraries
+      await fetchItineraries()
+      
+      return itineraryId
+    } catch (err) {
+      console.error("Error saving itinerary:", err)
+      const errorObj = err instanceof Error ? err : new Error("Failed to save itinerary")
+      setError(errorObj)
+      return null
+    } finally {
+      setIsSaving(false)
+    }
+  }, [isLoggedIn, currentItinerary, days, fetchItineraries])
+
+  // Delete an itinerary
+  const deleteCurrentItinerary = useCallback(async (): Promise<boolean> => {
+    if (!isLoggedIn || !currentItinerary) {
+      return false
+    }
+
+    try {
+      setIsLoading(true)
+      setError(null)
+      await deleteItinerary(currentItinerary.id)
+      setCurrentItinerary(null)
+      setDays([{ id: 1, locations: [] }])
+      
+      // Refresh the list of itineraries
+      await fetchItineraries()
+      
+      return true
+    } catch (err) {
+      console.error("Error deleting itinerary:", err)
+      const errorObj = err instanceof Error ? err : new Error("Failed to delete itinerary")
+      setError(errorObj)
+      return false
+    } finally {
+      setIsLoading(false)
+    }
+  }, [isLoggedIn, currentItinerary, fetchItineraries])
+
+  // Initialize by fetching itineraries
   useEffect(() => {
-    fetchItinerary()
-  }, [fetchItinerary])
-
-  const addDay = useCallback(async (date: string) => {
-    if (!isLoggedIn || !user) {
-      return { success: false, error: new Error("User not logged in") }
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from("itinerary_days")
-        .insert([{ user_id: user.id, date }])
-        .select()
-        .single()
-
-      if (error) throw error
-
-      // Add the new day to state
-      setDays(prev => [...prev, { id: data.id, date: data.date, locations: [] }])
-
-      return { success: true, data }
-    } catch (err) {
-      console.error("Error adding day:", err)
-      return { success: false, error: err }
-    }
-  }, [isLoggedIn, user, supabase])
-
-  const removeDay = useCallback(async (dayId: string) => {
-    if (!isLoggedIn) {
-      return { success: false, error: new Error("User not logged in") }
-    }
-
-    try {
-      // First delete all locations for this day
-      await supabase
-        .from("itinerary_locations")
-        .delete()
-        .eq("day_id", dayId)
-
-      // Then delete the day
-      const { error } = await supabase
-        .from("itinerary_days")
-        .delete()
-        .eq("id", dayId)
-
-      if (error) throw error
-
-      // Update state
-      setDays(prev => prev.filter(day => day.id !== dayId))
-
-      return { success: true }
-    } catch (err) {
-      console.error("Error removing day:", err)
-      return { success: false, error: err }
-    }
-  }, [isLoggedIn, supabase])
-
-  const addLocationToDay = useCallback(async (dayId: string, location: LocationData) => {
-    if (!isLoggedIn) {
-      return { success: false, error: new Error("User not logged in") }
-    }
-
-    try {
-      // Get the current max order for this day
-      const { data: orderData } = await supabase
-        .from("itinerary_locations")
-        .select("order")
-        .eq("day_id", dayId)
-        .order("order", { ascending: false })
-        .limit(1)
-
-      const nextOrder = orderData && orderData.length > 0 ? orderData[0].order + 1 : 0
-
-      // Add the location
-      const { error } = await supabase
-        .from("itinerary_locations")
-        .insert([{
-          day_id: dayId,
-          location_id: location.id,
-          order: nextOrder
-        }])
-
-      if (error) throw error
-
-      // Update state
-      setDays(prev => prev.map(day => {
-        if (day.id === dayId) {
-          return {
-            ...day,
-            locations: [...day.locations, location]
+    if (isLoggedIn) {
+      const initializeItinerary = async () => {
+        try {
+          setIsLoading(true);
+          const userItineraries = await getUserItineraries();
+          setItineraries(userItineraries);
+          
+          // If we have itineraries, load the most recent one
+          if (userItineraries.length > 0) {
+            const loadedItinerary = await getItinerary(userItineraries[0].id);
+            setCurrentItinerary(loadedItinerary);
+            setDays(loadedItinerary.days);
           }
+        } catch (err) {
+          console.error("Error initializing itinerary:", err);
+        } finally {
+          setIsLoading(false);
         }
-        return day
-      }))
-
-      return { success: true }
-    } catch (err) {
-      console.error("Error adding location to day:", err)
-      return { success: false, error: err }
+      };
+      
+      initializeItinerary();
     }
-  }, [isLoggedIn, supabase])
+  }, [isLoggedIn]);
 
-  const removeLocationFromDay = useCallback(async (dayId: string, locationId: string) => {
-    if (!isLoggedIn) {
-      return { success: false, error: new Error("User not logged in") }
+  // Auto-save whenever days change, but only if there are actual changes
+  useEffect(() => {
+    // Skip if not logged in, loading, or no current itinerary
+    if (!isLoggedIn || isLoading || isSaving) {
+      return;
     }
+    
+    // Only save if we have actual changes
+    const timer = setTimeout(() => {
+      autoSave();
+    }, 3000);
+    
+    return () => clearTimeout(timer);
+  }, [days, isLoggedIn, isLoading, isSaving, autoSave]);
 
-    try {
-      const { error } = await supabase
-        .from("itinerary_locations")
-        .delete()
-        .eq("day_id", dayId)
-        .eq("location_id", locationId)
+  // Custom setDays function that wraps the original one
+  const setDaysAndAutoSave = useCallback((newDays: ItineraryDay[] | ((prevDays: ItineraryDay[]) => ItineraryDay[])) => {
+    setDays(newDays);
+    // Auto-save is handled by the useEffect
+  }, []);
 
-      if (error) throw error
+  // Day management functions
+  const addDay = useCallback(() => {
+    const newDayId = days.length > 0 ? Math.max(...days.map(day => day.id)) + 1 : 1;
+    setDays(prev => [...prev, { id: newDayId, locations: [] }]);
+    return newDayId;
+  }, [days]);
 
-      // Update state
-      setDays(prev => prev.map(day => {
-        if (day.id === dayId) {
-          return {
-            ...day,
-            locations: day.locations.filter(loc => loc.id !== locationId)
-          }
+  const removeDay = useCallback((dayId: number) => {
+    setDays(prev => prev.filter(day => day.id !== dayId));
+  }, []);
+
+  const addLocationToDay = useCallback((dayId: number, location: LocationData) => {
+    setDays(prev => prev.map(day => {
+      if (day.id === dayId) {
+        // Check if location already exists in this day
+        const locationExists = day.locations.some(loc => loc.id === location.id);
+        if (locationExists) {
+          return day; // Don't add duplicate locations
         }
-        return day
-      }))
+        return {
+          ...day,
+          locations: [...day.locations, location]
+        };
+      }
+      return day;
+    }));
+  }, []);
 
-      return { success: true }
-    } catch (err) {
-      console.error("Error removing location from day:", err)
-      return { success: false, error: err }
-    }
-  }, [isLoggedIn, supabase])
-
-  const reorderLocations = useCallback(async (dayId: string, newOrder: LocationData[]) => {
-    if (!isLoggedIn) {
-      return { success: false, error: new Error("User not logged in") }
-    }
-
-    try {
-      // Update the order in the database
-      const updates = newOrder.map((location, index) => ({
-        day_id: dayId,
-        location_id: location.id,
-        order: index
-      }))
-
-      // First delete all existing entries
-      await supabase
-        .from("itinerary_locations")
-        .delete()
-        .eq("day_id", dayId)
-
-      // Then insert the new order
-      const { error } = await supabase
-        .from("itinerary_locations")
-        .insert(updates)
-
-      if (error) throw error
-
-      // Update state
-      setDays(prev => prev.map(day => {
-        if (day.id === dayId) {
-          return {
-            ...day,
-            locations: newOrder
-          }
-        }
-        return day
-      }))
-
-      return { success: true }
-    } catch (err) {
-      console.error("Error reordering locations:", err)
-      return { success: false, error: err }
-    }
-  }, [isLoggedIn, supabase])
+  const removeLocationFromDay = useCallback((dayId: number, locationId: string) => {
+    setDays(prev => prev.map(day => {
+      if (day.id === dayId) {
+        return {
+          ...day,
+          locations: day.locations.filter(loc => loc.id !== locationId)
+        };
+      }
+      return day;
+    }));
+  }, []);
 
   return {
     days,
+    setDays: setDaysAndAutoSave,
+    itineraries,
+    currentItinerary,
     isLoading,
+    isSaving,
     error,
-    fetchItinerary,
+    fetchItineraries,
+    loadItinerary,
+    saveItinerary: saveCurrentItinerary,
+    deleteItinerary: deleteCurrentItinerary,
     addDay,
     removeDay,
     addLocationToDay,
-    removeLocationFromDay,
-    reorderLocations
-  }
+    removeLocationFromDay
+  };
 }

@@ -7,7 +7,6 @@ import type { LocationData } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { HeartIcon as HeartOutline } from "@heroicons/react/24/outline"
 import { HeartIcon as HeartSolid } from "@heroicons/react/24/solid"
-import { createClient } from "@/lib/supabase/client"
 import { useFavorites } from "@/hooks/use-favorites"
 import { useAuth } from "@/hooks/use-auth"
 

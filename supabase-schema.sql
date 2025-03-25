@@ -1,7 +1,13 @@
--- Drop existing tables if they exist (to start fresh)
+-- Drop dependent tables first
+DROP TABLE IF EXISTS itinerary_locations;
+DROP TABLE IF EXISTS itinerary_days;
+DROP TABLE IF EXISTS user_itineraries;
 DROP TABLE IF EXISTS user_favorites;
+
+-- Then drop the tables they depend on
 DROP TABLE IF EXISTS locations;
 DROP TABLE IF EXISTS categories;
+
 
 -- Create categories table
 CREATE TABLE categories (
@@ -27,6 +33,35 @@ CREATE TABLE user_favorites (
   location_id TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(user_id, location_id)
+);
+
+-- Create user itineraries table to store user's planned trips
+CREATE TABLE user_itineraries (
+  id SERIAL PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create itinerary days table to store days within an itinerary
+CREATE TABLE itinerary_days (
+  id SERIAL PRIMARY KEY,
+  itinerary_id INTEGER NOT NULL REFERENCES user_itineraries(id) ON DELETE CASCADE,
+  day_number INTEGER NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(itinerary_id, day_number)
+);
+
+-- Create itinerary locations table to store locations within a day
+CREATE TABLE itinerary_locations (
+  id SERIAL PRIMARY KEY,
+  day_id INTEGER NOT NULL REFERENCES itinerary_days(id) ON DELETE CASCADE,
+  location_id TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(day_id, location_id)
 );
 
 -- Insert predefined categories

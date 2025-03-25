@@ -33,6 +33,17 @@ interface ItineraryDay {
 export default function PlannerClient({ initialLocations, categories }: PlannerClientProps) {
   const { isLoggedIn } = useAuth();
   const { favorites: userFavorites, refreshFavorites: fetchFavorites } = useFavorites();
+  const { 
+    days, 
+    setDays, 
+    addDay, 
+    removeDay, 
+    addLocationToDay, 
+    removeLocationFromDay,
+    isLoading: isItineraryLoading,
+    isSaving
+  } = useItinerary();
+  
   const [filteredLocations, setFilteredLocations] = useState<LocationData[]>(initialLocations)
   const [hoveredLocation, setHoveredLocation] = useState<LocationData | null>(null)
   const [visibleLocations, setVisibleLocations] = useState<LocationData[]>(initialLocations)
@@ -42,7 +53,6 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   
   // Itinerary state
-  const [days, setDays] = useState<ItineraryDay[]>([{ id: 1, locations: [] }])
   const [selectedDay, setSelectedDay] = useState<number>(1)
   const [showDaySelector, setShowDaySelector] = useState<boolean>(false)
   const [locationToAdd, setLocationToAdd] = useState<LocationData | null>(null)
@@ -145,29 +155,11 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
   }
 
   // Day management functions
-  const addDay = () => {
-    const newDayId = days.length > 0 ? Math.max(...days.map(day => day.id)) + 1 : 1;
-    setDays([...days, { id: newDayId, locations: [] }]);
-    setSelectedDay(newDayId);
-  }
-
-  const removeDay = (dayId: number) => {
-    if (days.length <= 1) return; // Don't remove the last day
-    
-    const newDays = days.filter(day => day.id !== dayId);
-    setDays(newDays);
-    
-    // If the selected day was removed, select the first available day
-    if (selectedDay === dayId && newDays.length > 0) {
-      setSelectedDay(newDays[0].id);
-    }
-  }
-
   const selectDay = (dayId: number) => {
     setSelectedDay(dayId);
   }
 
-  // Location management for itinerary
+  // Location to day functions
   const showAddToDay = (location: LocationData) => {
     setLocationToAdd(location);
     setShowDaySelector(true);
@@ -178,48 +170,30 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
     setLocationToAdd(null);
   }
 
-  const addLocationToDay = (dayId: number, location: LocationData) => {
-    setDays(days.map(day => {
-      if (day.id === dayId) {
-        // Check if location already exists in this day
-        if (!day.locations.some(loc => loc.id === location.id)) {
-          return { ...day, locations: [...day.locations, location] };
-        }
-      }
-      return day;
-    }));
-    hideAddToDay();
-  }
-
-  const removeLocationFromDay = (dayId: number, locationId: string) => {
-    setDays(days.map(day => {
-      if (day.id === dayId) {
-        return { ...day, locations: day.locations.filter(loc => loc.id !== locationId) };
-      }
-      return day;
-    }));
-  }
-
   return (
-    <div className="flex-1 flex flex-col h-full">
-      {/* Day selector modal */}
+    <div className="h-full flex flex-col">
+      {/* Add to day selector */}
       {showDaySelector && locationToAdd && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg p-6 max-w-sm w-full">
-            <h3 className="text-lg font-medium mb-4">Add to which day?</h3>
+            <h3 className="text-lg font-medium mb-4">Add to Day</h3>
             <div className="space-y-2 max-h-60 overflow-y-auto">
-              {days.map(day => (
+              {days.map((day) => (
                 <button
                   key={day.id}
-                  onClick={() => addLocationToDay(day.id, locationToAdd)}
-                  className="w-full text-left px-4 py-2 rounded hover:bg-gray-100"
+                  onClick={() => {
+                    addLocationToDay(day.id, locationToAdd);
+                    hideAddToDay();
+                  }}
+                  className="w-full text-left p-2 hover:bg-gray-100 rounded flex justify-between items-center"
                 >
-                  Day {day.id} ({day.locations.length} activities)
+                  <span>Day {day.id}</span>
+                  <span className="text-gray-500 text-sm">{day.locations.length} locations</span>
                 </button>
               ))}
             </div>
             <div className="mt-4 flex justify-end">
-              <button 
+              <button
                 onClick={hideAddToDay}
                 className="px-4 py-2 border rounded hover:bg-gray-100"
               >
@@ -233,119 +207,107 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
       {/* Mobile: Toggle between map, list, and plan views */}
       {isMobile ? (
         <div className="h-full relative flex flex-col">
-          {/* Map View */}
-          {mobileView === "map" && (
-            <>
-              <div className="flex-1 relative">
-                <div className="absolute top-2 left-2 z-10">
-                  <CategoryFilter 
-                    categories={categories.map(cat => cat.name)} 
-                    onFilterChange={handleFilterChange}
-                    onFavoritesFilterChange={handleFavoritesFilterChange}
-                    refreshFavorites={refreshFavorites}
-                  />
+          {/* Mobile navigation */}
+          <div className="bg-white border-b p-2 flex justify-center space-x-2">
+            <button
+              onClick={() => setMobileView("map")}
+              className={`flex-1 py-2 px-3 rounded-md flex items-center justify-center space-x-1 ${
+                mobileView === "map" ? "bg-blue-100 text-blue-700" : "text-gray-600"
+              }`}
+            >
+              <MapIcon className="w-5 h-5" />
+              <span>Map</span>
+            </button>
+            <button
+              onClick={() => setMobileView("list")}
+              className={`flex-1 py-2 px-3 rounded-md flex items-center justify-center space-x-1 ${
+                mobileView === "list" ? "bg-blue-100 text-blue-700" : "text-gray-600"
+              }`}
+            >
+              <ListBulletIcon className="w-5 h-5" />
+              <span>List</span>
+            </button>
+            <button
+              onClick={() => setMobileView("plan")}
+              className={`flex-1 py-2 px-3 rounded-md flex items-center justify-center space-x-1 ${
+                mobileView === "plan" ? "bg-blue-100 text-blue-700" : "text-gray-600"
+              }`}
+            >
+              <CalendarIcon className="w-5 h-5" />
+              <span>Plan</span>
+            </button>
+          </div>
+          
+          {/* Mobile content area */}
+          <div className="flex-1 overflow-hidden">
+            {mobileView === "map" && (
+              <MapView
+                locations={filteredLocations}
+                onLocationHover={handleLocationHover}
+                hoveredLocation={hoveredLocation}
+                onViewportChange={handleViewportChange}
+                refreshFavorites={refreshFavorites}
+                onAddToDay={showAddToDay}
+                categories={categories.map(cat => cat.name)}
+                onFilterChange={handleFilterChange}
+                onFavoritesFilterChange={handleFavoritesFilterChange}
+              />
+            )}
+            {mobileView === "list" && (
+              <ListView
+                locations={visibleLocations}
+                onLocationHover={handleLocationHover}
+                hoveredLocation={hoveredLocation}
+                refreshFavorites={refreshFavorites}
+                userFavorites={userFavorites}
+                onAddToDay={showAddToDay}
+              />
+            )}
+            {mobileView === "plan" && (
+              <div className="h-full flex flex-col">
+                <div className="p-3 bg-white border-b flex justify-between items-center">
+                  <h2 className="text-lg font-medium">Your Plan</h2>
+                  <div className="flex space-x-2">
+                    <button 
+                      onClick={addDay}
+                      className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
+                      Add Day
+                    </button>
+                  </div>
                 </div>
-                <MapView
-                  locations={filteredLocations}
-                  onLocationHover={handleLocationHover}
-                  hoveredLocation={hoveredLocation}
-                  onViewportChange={handleViewportChange}
-                  refreshFavorites={refreshFavorites}
-                  onAddToDay={showAddToDay}
-                  categories={categories.map(cat => cat.name)}
-                  onFilterChange={handleFilterChange}
-                  onFavoritesFilterChange={handleFavoritesFilterChange}
-                />
-              </div>
-            </>
-          )}
-
-          {/* List View */}
-          {mobileView === "list" && (
-            <>
-              <div className="flex-1 overflow-hidden flex flex-col">
-                <div className="flex-1 overflow-y-auto">
-                  {getVisibleLocations().length > 0 ? (
-                    <ListView
-                      locations={getVisibleLocations()}
-                      onLocationHover={handleLocationHover}
-                      hoveredLocation={hoveredLocation}
-                      refreshFavorites={refreshFavorites}
-                      userFavorites={userFavorites}
-                      onAddToDay={showAddToDay}
+                <div className="flex-1 overflow-y-auto p-4">
+                  {days.length === 0 ? (
+                    <EmptyState
+                      message="No days planned yet"
+                      description="Add a day to start planning your trip"
                     />
                   ) : (
-                    <EmptyState
-                      message="No locations found. Try adjusting your filters to see more locations."
-                    />
+                    <div className="space-y-6">
+                      {days.map((day) => (
+                        <DayItinerary
+                          key={day.id}
+                          day={day}
+                          isSelected={day.id === selectedDay}
+                          onSelect={() => selectDay(day.id)}
+                          onRemove={() => removeDay(day.id)}
+                          onRemoveLocation={(locationId) => removeLocationFromDay(day.id, locationId)}
+                        />
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>
-            </>
-          )}
-
-          {/* Plan View */}
-          {mobileView === "plan" && (
-            <div className="flex-1 overflow-hidden flex flex-col">
-              <div className="sticky top-0 z-10 p-2 bg-white border-b flex justify-between items-center">
-                <h2 className="text-lg font-medium">Your Itinerary</h2>
-                <div className="flex space-x-2">
-                  <button 
-                    onClick={addDay}
-                    className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
-                  >
-                    Add Day
-                  </button>
-                </div>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto p-4">
-                {days.map(day => (
-                  <DayItinerary
-                    key={day.id}
-                    day={day}
-                    isSelected={day.id === selectedDay}
-                    onSelect={() => selectDay(day.id)}
-                    onRemove={() => removeDay(day.id)}
-                    onRemoveLocation={(locationId) => removeLocationFromDay(day.id, locationId)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Bottom navigation */}
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around p-2 z-10">
-            <button 
-              onClick={() => toggleMobileView("map")}
-              className={`flex flex-col items-center p-2 ${mobileView === "map" ? "text-blue-500" : "text-gray-500"}`}
-            >
-              <MapIcon className="h-6 w-6" />
-              <span className="text-xs">Map</span>
-            </button>
-            <button 
-              onClick={() => toggleMobileView("list")}
-              className={`flex flex-col items-center p-2 ${mobileView === "list" ? "text-blue-500" : "text-gray-500"}`}
-            >
-              <ListBulletIcon className="h-6 w-6" />
-              <span className="text-xs">List</span>
-            </button>
-            <button 
-              onClick={() => toggleMobileView("plan")}
-              className={`flex flex-col items-center p-2 ${mobileView === "plan" ? "text-blue-500" : "text-gray-500"}`}
-            >
-              <CalendarIcon className="h-6 w-6" />
-              <span className="text-xs">Plan</span>
-            </button>
+            )}
           </div>
         </div>
       ) : (
-        /* Desktop: Three-column layout (itinerary, list, map) */
-        <div className="flex-1 flex flex-row overflow-hidden h-full">
-          {/* Left column: Day-based itinerary */}
-          <div className="w-[30%] h-full flex flex-col overflow-hidden border-r">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h2 className="text-xl font-medium">Your Itinerary</h2>
+        // Desktop: Three-column layout (plan, list, map)
+        <div className="h-full flex">
+          {/* Left column: Plan view */}
+          <div className="w-[30%] h-full flex flex-col border-r">
+            <div className="p-3 bg-white border-b flex justify-between items-center">
+              <h2 className="text-lg font-medium">Your Plan</h2>
               <div className="flex space-x-2">
                 <button 
                   onClick={addDay}
@@ -356,36 +318,39 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
-              {days.map(day => (
-                <DayItinerary
-                  key={day.id}
-                  day={day}
-                  isSelected={day.id === selectedDay}
-                  onSelect={() => selectDay(day.id)}
-                  onRemove={() => removeDay(day.id)}
-                  onRemoveLocation={(locationId) => removeLocationFromDay(day.id, locationId)}
+              {days.length === 0 ? (
+                <EmptyState
+                  message="No days planned yet"
+                  description="Add a day to start planning your trip"
                 />
-              ))}
+              ) : (
+                <div className="space-y-6">
+                  {days.map((day) => (
+                    <DayItinerary
+                      key={day.id}
+                      day={day}
+                      isSelected={day.id === selectedDay}
+                      onSelect={() => selectDay(day.id)}
+                      onRemove={() => removeDay(day.id)}
+                      onRemoveLocation={(locationId) => removeLocationFromDay(day.id, locationId)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
           {/* Middle column: List view */}
-          <div className="w-[30%] h-full flex flex-col overflow-hidden border-r">
+          <div className="w-[30%] h-full flex flex-col border-r">
             <div className="flex-1 overflow-y-auto">
-              {getVisibleLocations().length > 0 ? (
-                <ListView
-                  locations={getVisibleLocations()}
-                  onLocationHover={handleLocationHover}
-                  hoveredLocation={hoveredLocation}
-                  refreshFavorites={refreshFavorites}
-                  userFavorites={userFavorites}
-                  onAddToDay={showAddToDay}
-                />
-              ) : (
-                <EmptyState
-                  message="No locations found. Try adjusting your filters to see more locations."
-                />
-              )}
+              <ListView
+                locations={visibleLocations}
+                onLocationHover={handleLocationHover}
+                hoveredLocation={hoveredLocation}
+                refreshFavorites={refreshFavorites}
+                userFavorites={userFavorites}
+                onAddToDay={showAddToDay}
+              />
             </div>
           </div>
 
