@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Filter, Heart } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
-import { getUserFavorites } from "@/lib/supabase/favorites"
+import { useAuth } from "@/hooks/use-auth"
+import { useFavorites } from "@/hooks/use-favorites"
 
 interface CategoryFilterProps {
   categories: string[]
@@ -19,21 +19,12 @@ export default function CategoryFilter({
   onFavoritesFilterChange,
   refreshFavorites
 }: CategoryFilterProps) {
+  const { isLoggedIn } = useAuth();
+  const { refreshFavorites: refreshUserFavorites } = useFavorites();
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const filterRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      setIsLoggedIn(!!user);
-    };
-    
-    checkAuth();
-  }, []);
 
   // Add click outside handler to close the filter panel
   useEffect(() => {

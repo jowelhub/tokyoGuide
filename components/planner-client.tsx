@@ -9,9 +9,10 @@ import CategoryFilter from "@/components/category-filter"
 import ListView from "@/components/planner-list-view"
 import EmptyState from "@/components/empty-state"
 import { MapIcon, ListBulletIcon, CalendarIcon } from "@heroicons/react/24/outline"
-import { createClient } from "@/lib/supabase/client"
-import { getUserFavorites } from "@/lib/supabase/favorites"
 import DayItinerary from "@/components/day-itinerary"
+import { useAuth } from "@/hooks/use-auth"
+import { useFavorites } from "@/hooks/use-favorites"
+import { useItinerary } from "@/hooks/use-itinerary"
 
 // Dynamically import MapView to avoid SSR issues with Leaflet
 const MapView = dynamic(() => import("@/components/planner-map-view"), {
@@ -30,14 +31,14 @@ interface ItineraryDay {
 }
 
 export default function PlannerClient({ initialLocations, categories }: PlannerClientProps) {
+  const { isLoggedIn } = useAuth();
+  const { favorites: userFavorites, refreshFavorites: fetchFavorites } = useFavorites();
   const [filteredLocations, setFilteredLocations] = useState<LocationData[]>(initialLocations)
   const [hoveredLocation, setHoveredLocation] = useState<LocationData | null>(null)
   const [visibleLocations, setVisibleLocations] = useState<LocationData[]>(initialLocations)
   const isMobile = useMediaQuery("(max-width: 768px)")
   const [mobileView, setMobileView] = useState<"map" | "list" | "plan">("map") // Default to map view on mobile
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
-  const [userFavorites, setUserFavorites] = useState<string[]>([])
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   
   // Itinerary state
@@ -48,50 +49,39 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 
   // Function to refresh favorites - will be passed to child components
   const refreshFavorites = async () => {
-    if (isLoggedIn) {
-      try {
-        // Get the latest favorites from the database
-        const favorites = await getUserFavorites();
-        
-        // Update the favorites state
-        setUserFavorites(favorites);
-        
-        // If we're showing only favorites, we need to update the filtered locations immediately
-        if (showOnlyFavorites) {
-          // Apply both favorites and category filters
-          const newFilteredLocations = initialLocations.filter(location => 
-            favorites.includes(location.id) && 
-            (selectedCategories.length === 0 || selectedCategories.includes(location.category.toLowerCase()))
-          );
-          
-          // Update the filtered locations
-          setFilteredLocations(newFilteredLocations);
-        }
-      } catch (error) {
-        console.error("Error refreshing user favorites:", error);
-      }
+    await fetchFavorites();
+    
+    // If we're showing only favorites, we need to update the filtered locations immediately
+    if (showOnlyFavorites) {
+      // Apply both favorites and category filters
+      const newFilteredLocations = initialLocations.filter(location => 
+        userFavorites.includes(location.id) && 
+        (selectedCategories.length === 0 || selectedCategories.includes(location.category))
+      );
+      setFilteredLocations(newFilteredLocations);
     }
   };
 
-  // Check if user is logged in and get their favorites
+  // Apply filters whenever selectedCategories or showOnlyFavorites changes
   useEffect(() => {
-    const checkAuthAndFavorites = async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      setIsLoggedIn(!!user);
-      
-      if (user) {
-        try {
-          const favorites = await getUserFavorites();
-          setUserFavorites(favorites);
-        } catch (error) {
-          console.error("Error fetching user favorites:", error);
-        }
-      }
-    };
+    let newFilteredLocations = initialLocations;
     
-    checkAuthAndFavorites();
-  }, []);
+    // Apply category filter if any categories are selected
+    if (selectedCategories.length > 0) {
+      newFilteredLocations = newFilteredLocations.filter(location => 
+        selectedCategories.includes(location.category)
+      );
+    }
+    
+    // Apply favorites filter if showOnlyFavorites is true
+    if (showOnlyFavorites) {
+      newFilteredLocations = newFilteredLocations.filter(location => 
+        userFavorites.includes(location.id)
+      );
+    }
+    
+    setFilteredLocations(newFilteredLocations);
+  }, [initialLocations, selectedCategories, showOnlyFavorites, userFavorites]);
 
   const handleFilterChange = (selectedCategories: string[]) => {
     setSelectedCategories(selectedCategories);

@@ -1,14 +1,15 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import type { LocationData } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { HeartIcon as HeartOutline } from "@heroicons/react/24/outline"
 import { HeartIcon as HeartSolid } from "@heroicons/react/24/solid"
-import { toggleFavorite } from "@/lib/supabase/favorites"
 import { createClient } from "@/lib/supabase/client"
-import { useEffect, useState } from "react"
+import { useFavorites } from "@/hooks/use-favorites"
+import { useAuth } from "@/hooks/use-auth"
 
 interface ListViewProps {
   locations: LocationData[]
@@ -25,20 +26,11 @@ export default function ListView({
   refreshFavorites,
   userFavorites = []
 }: ListViewProps) {
+  const { isLoggedIn } = useAuth();
+  const { toggleFavorite, isLoading, isFavorited } = useFavorites();
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isLoading, setIsLoading] = useState<Record<string, boolean>>({});
-  const supabase = createClient();
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setIsLoggedIn(!!user);
-    };
-    
-    checkAuth();
-  }, [supabase]);
-
+  
+  // Initialize favorites from userFavorites prop
   useEffect(() => {
     if (userFavorites.length > 0) {
       const favoritesMap: Record<string, boolean> = {};
@@ -87,26 +79,20 @@ export default function ListView({
     
     if (isLoading[locationId]) return;
     
-    setIsLoading(prev => ({ ...prev, [locationId]: true }));
+    // Use the toggleFavorite function from the hook
+    const success = await toggleFavorite(locationId);
     
-    try {
-      // First update local state for immediate feedback
-      const newFavoritedState = !favorites[locationId];
-      setFavorites(prev => ({ ...prev, [locationId]: newFavoritedState }));
+    if (success) {
+      // Update local state for immediate feedback
+      setFavorites(prev => ({
+        ...prev,
+        [locationId]: !prev[locationId]
+      }));
       
-      // Then update the database
-      await toggleFavorite(locationId);
-      
-      // Then refresh parent component state
+      // Then refresh parent component state if needed
       if (refreshFavorites) {
         await refreshFavorites();
       }
-    } catch (error) {
-      // Revert local state if there was an error
-      setFavorites(prev => ({ ...prev, [locationId]: !prev[locationId] }));
-      console.error("Error toggling favorite:", error);
-    } finally {
-      setIsLoading(prev => ({ ...prev, [locationId]: false }));
     }
   };
 

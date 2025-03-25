@@ -10,8 +10,8 @@ import { markerIcon, highlightedMarkerIcon } from "@/lib/marker-icon"
 import type { MapViewProps } from "@/lib/types"
 import { XMarkIcon, HeartIcon as HeartOutline } from "@heroicons/react/24/outline"
 import { HeartIcon as HeartSolid } from "@heroicons/react/24/solid"
-import { toggleFavorite, getUserFavorites } from "@/lib/supabase/favorites"
-import { createClient } from "@/lib/supabase/client"
+import { useAuth } from "@/hooks/use-auth"
+import { useFavorites } from "@/hooks/use-favorites"
 
 // Custom styles for Leaflet popups - we'll add this to override default Leaflet styles
 const customPopupStyles = `
@@ -132,36 +132,12 @@ function AirbnbStylePopup({
 }) {
   const [isFavorited, setIsFavorited] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const supabase = createClient();
-
-  // Check if user is logged in and get favorite status
+  const { isLoggedIn } = useAuth();
+  const { toggleFavorite, isFavorited: checkIsFavorited, isLoading: favoriteLoading } = useFavorites();
+  
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const loggedIn = !!user;
-      setIsLoggedIn(loggedIn);
-      
-      if (loggedIn && user) {
-        // Check if this location is favorited
-        try {
-          const { data } = await supabase
-            .from("user_favorites")
-            .select("id")
-            .eq("user_id", user.id)
-            .eq("location_id", location.id)
-            .single();
-          
-          setIsFavorited(!!data);
-        } catch (error) {
-          // If error, assume not favorited
-          setIsFavorited(false);
-        }
-      }
-    };
-    
-    checkAuth();
-  }, [location.id, supabase]);
+    setIsFavorited(checkIsFavorited(location.id));
+  }, [location.id, checkIsFavorited]);
 
   const handleHeartClick = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -173,7 +149,7 @@ function AirbnbStylePopup({
       return;
     }
     
-    if (isLoading) return;
+    if (favoriteLoading[location.id]) return;
     
     setIsLoading(true);
     try {

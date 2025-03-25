@@ -2,39 +2,15 @@
 
 import Link from "next/link"
 import { Home, Map, LogIn, UserPlus, Menu, X, Calendar } from "lucide-react"
-import { useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useState } from "react"
+import { useAuth } from "@/hooks/use-auth"
 
 export default function Header() {
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const { user, isLoading, signOut } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   
-  useEffect(() => {
-    const supabase = createClient()
-    
-    // Check current auth status
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-      setLoading(false)
-    }
-    
-    checkUser()
-    
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      setUser(session?.user || null)
-    })
-    
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [])
-  
   const handleSignOut = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
+    await signOut()
   }
 
   const toggleMobileMenu = () => {
@@ -60,7 +36,7 @@ export default function Header() {
   
   // Auth section component
   const AuthSection = ({ isMobile = false }: { isMobile?: boolean }) => {
-    if (loading) return null;
+    if (isLoading) return null;
     
     if (user) {
       return (

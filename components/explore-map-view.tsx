@@ -12,6 +12,8 @@ import { XMarkIcon, HeartIcon as HeartOutline } from "@heroicons/react/24/outlin
 import { HeartIcon as HeartSolid } from "@heroicons/react/24/solid"
 import { toggleFavorite, getUserFavorites } from "@/lib/supabase/favorites"
 import { createClient } from "@/lib/supabase/client"
+import { useAuth } from "@/hooks/use-auth"
+import { useFavorites } from "@/hooks/use-favorites"
 
 // Custom styles for Leaflet popups - we'll add this to override default Leaflet styles
 const customPopupStyles = `
@@ -130,32 +132,14 @@ function AirbnbStylePopup({
   location: MapViewProps['locations'][0],
   refreshFavorites?: () => Promise<void>
 }) {
+  const { isLoggedIn } = useAuth();
+  const { toggleFavorite, isFavorited: checkIsFavorited, isLoading } = useFavorites();
   const [isFavorited, setIsFavorited] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const supabase = createClient();
-
-  // Check if user is logged in and get favorite status
+  
+  // Check if this location is favorited
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const loggedIn = !!user;
-      setIsLoggedIn(loggedIn);
-      
-      if (loggedIn && user) {
-        // Check if this location is favorited
-        try {
-          const favorites = await getUserFavorites();
-          setIsFavorited(favorites.includes(location.id));
-        } catch (error) {
-          // If error, assume not favorited
-          setIsFavorited(false);
-        }
-      }
-    };
-    
-    checkAuth();
-  }, [location.id, supabase]);
+    setIsFavorited(checkIsFavorited(location.id));
+  }, [location.id, checkIsFavorited]);
 
   const handleHeartClick = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -167,35 +151,27 @@ function AirbnbStylePopup({
       return;
     }
     
-    if (isLoading) return;
+    if (isLoading[location.id]) return;
     
-    setIsLoading(true);
-    try {
-      // First update local state for immediate feedback
-      const newFavoritedState = !isFavorited;
-      setIsFavorited(newFavoritedState);
+    // Toggle favorite status
+    const success = await toggleFavorite(location.id);
+    
+    if (success) {
+      // Update local state for immediate feedback
+      setIsFavorited(!isFavorited);
       
-      // Then update the database
-      await toggleFavorite(location.id);
-      
-      // Then refresh parent component state
+      // Then refresh parent component state if needed
       if (refreshFavorites) {
         await refreshFavorites();
       }
       
       // Close popup if removing a favorite in favorites-only mode
-      if (!newFavoritedState && document.querySelector('[data-favorites-filter="true"]')) {
+      if (!isFavorited && document.querySelector('[data-favorites-filter="true"]')) {
         const closeButton = document.querySelector('.leaflet-popup-close-button') as HTMLElement;
         if (closeButton) {
           closeButton.click();
         }
       }
-    } catch (error) {
-      // Revert local state if there was an error
-      setIsFavorited(!isFavorited);
-      console.error("Error toggling favorite:", error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
