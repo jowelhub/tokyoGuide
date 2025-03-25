@@ -1,7 +1,7 @@
 import { getLocations } from "@/lib/supabase/locations"
 import { getCategories } from "@/lib/supabase/categories"
 import Header from "@/components/layout/header"
-import PlannerClient from "@/components/planner-client"
+import PlannerClient from "@/components/planner/planner-client"
 
 export default async function PlannerPage() {
   // Fetch locations and categories from Supabase

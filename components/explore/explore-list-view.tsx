@@ -5,7 +5,7 @@ import Link from "next/link"
 import type { LocationData } from "@/lib/types"
 import { useFavorites } from "@/hooks/use-favorites"
 import { useAuth } from "@/hooks/use-auth"
-import LocationCard from "./location-card"
+import LocationCard from "../location-card"
 
 interface ListViewProps {
   locations: LocationData[]

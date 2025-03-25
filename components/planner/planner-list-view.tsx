@@ -5,7 +5,7 @@ import type { LocationData } from "@/lib/types"
 import { PlusIcon } from "@heroicons/react/24/outline"
 import { useFavorites } from "@/hooks/use-favorites"
 import { useAuth } from "@/hooks/use-auth"
-import LocationCard from "./location-card"
+import LocationCard from "../location-card"
 
 interface PlannerListViewProps {
   locations: LocationData[]

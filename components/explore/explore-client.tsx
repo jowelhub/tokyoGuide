@@ -5,9 +5,9 @@ import dynamic from "next/dynamic"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import type { LocationData } from "@/lib/types"
 import type { CategoryData } from "@/lib/supabase/categories"
-import CategoryFilter from "./category-filter"
+import CategoryFilter from "../category-filter"
 import ListView from "./explore-list-view"
-import EmptyState from "./empty-state"
+import EmptyState from "../empty-state"
 import { MapIcon, ListBulletIcon } from "@heroicons/react/24/outline"
 import { useAuth } from "@/hooks/use-auth"
 import { useFavorites } from "@/hooks/use-favorites"
@@ -18,7 +18,7 @@ import Link from "next/link"
 import Image from "next/image"
 
 // Dynamically import MapView to avoid SSR issues with Leaflet
-const MapView = dynamic(() => import("./map-view"), {
+const MapView = dynamic(() => import("../map-view"), {
   ssr: false,
   loading: () => <div className="h-full w-full bg-gray-100 flex items-center justify-center">Loading map...</div>,
 })
@@ -145,7 +145,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
     isLoadingFavorite, 
     onClosePopup,
     refreshFavorites 
-  }: import("./map-view").PopupContentProps) => {
+  }: import("../map-view").PopupContentProps) => {
     return (
       <Link 
         href={`/location/${location.id}`}

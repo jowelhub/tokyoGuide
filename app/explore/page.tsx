@@ -1,7 +1,7 @@
 import { getLocations } from "@/lib/supabase/locations"
 import { getCategories } from "@/lib/supabase/categories"
 import Header from "@/components/layout/header"
-import ExploreClient from "@/components/explore-client"
+import ExploreClient from "@/components/explore/explore-client"
 
 export default async function ExplorePage() {
   // Fetch locations and categories from Supabase
