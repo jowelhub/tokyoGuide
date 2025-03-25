@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
+import Link from "next/link"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import type { LocationData } from "@/lib/types"
 import type { CategoryData } from "@/lib/supabase/categories"
@@ -9,13 +10,16 @@ import CategoryFilter from "@/components/category-filter"
 import ListView from "@/components/planner-list-view"
 import EmptyState from "@/components/empty-state"
 import { MapIcon, ListBulletIcon, CalendarIcon } from "@heroicons/react/24/outline"
+import { HeartIcon as HeartOutline } from "@heroicons/react/24/outline"
+import { HeartIcon as HeartSolid, PlusIcon } from "@heroicons/react/24/solid"
 import DayItinerary from "@/components/day-itinerary"
 import { useAuth } from "@/hooks/use-auth"
 import { useFavorites } from "@/hooks/use-favorites"
 import { useItinerary } from "@/hooks/use-itinerary"
+import Image from "next/image"
 
 // Dynamically import MapView to avoid SSR issues with Leaflet
-const MapView = dynamic(() => import("@/components/planner-map-view"), {
+const MapView = dynamic(() => import("@/components/map-view"), {
   ssr: false,
   loading: () => <div className="h-full w-full bg-gray-100 flex items-center justify-center">Loading map...</div>,
 })
@@ -32,17 +36,7 @@ interface ItineraryDay {
 
 export default function PlannerClient({ initialLocations, categories }: PlannerClientProps) {
   const { isLoggedIn } = useAuth();
-  const { favorites: userFavorites, refreshFavorites: fetchFavorites } = useFavorites();
-  const { 
-    days, 
-    setDays, 
-    addDay, 
-    removeDay, 
-    addLocationToDay, 
-    removeLocationFromDay,
-    isLoading: isItineraryLoading,
-    isSaving
-  } = useItinerary();
+  const { favorites: userFavorites, refreshFavorites: fetchFavorites, toggleFavorite, isFavorited, isLoading: isLoadingFavorite } = useFavorites();
   
   const [filteredLocations, setFilteredLocations] = useState<LocationData[]>(initialLocations)
   const [hoveredLocation, setHoveredLocation] = useState<LocationData | null>(null)
@@ -170,6 +164,122 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
     setLocationToAdd(null);
   }
 
+  // Function to render popup content for the Planner view
+  const renderPlannerPopupContent = ({ 
+    location, 
+    isLoggedIn, 
+    isFavorited, 
+    toggleFavorite, 
+    isLoadingFavorite, 
+    onClosePopup,
+    refreshFavorites,
+    onAddToDay 
+  }: import("@/components/map-view").PopupContentProps) => {
+    return (
+      <div className="airbnb-popup-content">
+        <div className="relative w-full h-0 pb-[56.25%]">
+          <Image
+            src={location.images[0] || "/placeholder.svg"}
+            alt={location.name}
+            fill
+            className="object-cover"
+          />
+          <div 
+            className="airbnb-popup-heart absolute left-2 top-2 bg-white rounded-full w-8 h-8 flex items-center justify-center z-10 cursor-pointer shadow-sm" 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              
+              if (!isLoggedIn) {
+                // Redirect to login if not logged in
+                window.open('/login', '_blank');
+                return;
+              }
+              
+              if (isLoadingFavorite[location.id]) return;
+              
+              // Toggle favorite status
+              toggleFavorite(location.id).then(success => {
+                // Then refresh parent component state if needed
+                if (success && refreshFavorites) {
+                  refreshFavorites();
+                }
+              });
+            }}
+            title={isLoggedIn ? (isFavorited(location.id) ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}
+          >
+            {isFavorited(location.id) ? 
+              <HeartSolid className="w-5 h-5 text-red-500" /> : 
+              <HeartOutline className="w-5 h-5 text-gray-700" />
+            }
+          </div>
+          <div 
+            className="absolute right-2 top-2 bg-white rounded-full w-8 h-8 flex items-center justify-center z-10 cursor-pointer shadow-sm" 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClosePopup();
+            }}
+            title="Close"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-700">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </div>
+        </div>
+        <Link 
+          href={`/location/${location.id}`}
+          target="_blank"
+          className="block"
+          onClick={(e) => {
+            // Don't propagate if clicking on the Add to itinerary button
+            if ((e.target as HTMLElement).closest('button')) {
+              e.stopPropagation();
+            }
+          }}
+        >
+          <div className="p-4">
+            <h3 className="font-medium text-xl text-gray-900">{location.name}</h3>
+            <p className="text-sm text-gray-600 line-clamp-2 mt-1">{location.description}</p>
+            <div className="mt-2">
+              <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-800">
+                {location.category}
+              </span>
+            </div>
+          </div>
+        </Link>
+        
+        {onAddToDay && (
+          <div className="px-4 pb-4">
+            <button 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onClosePopup();
+                onAddToDay(location);
+              }}
+              className="w-full flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg transition-colors"
+            >
+              <PlusIcon className="w-5 h-5" />
+              <span>Add to itinerary</span>
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const { 
+    days, 
+    setDays, 
+    addDay, 
+    removeDay, 
+    addLocationToDay, 
+    removeLocationFromDay,
+    isLoading: isItineraryLoading,
+    isSaving
+  } = useItinerary();
+  
   return (
     <div className="h-full flex flex-col">
       {/* Add to day selector */}
@@ -241,17 +351,31 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
           {/* Mobile content area */}
           <div className="flex-1 overflow-hidden">
             {mobileView === "map" && (
-              <MapView
-                locations={filteredLocations}
-                onLocationHover={handleLocationHover}
-                hoveredLocation={hoveredLocation}
-                onViewportChange={handleViewportChange}
-                refreshFavorites={refreshFavorites}
-                onAddToDay={showAddToDay}
-                categories={categories.map(cat => cat.name)}
-                onFilterChange={handleFilterChange}
-                onFavoritesFilterChange={handleFavoritesFilterChange}
-              />
+              <div className="relative h-full">
+                <div className="absolute top-2 left-2 z-[1000]">
+                  <CategoryFilter 
+                    categories={categories.map(cat => cat.name)} 
+                    onFilterChange={handleFilterChange}
+                    onFavoritesFilterChange={handleFavoritesFilterChange}
+                    refreshFavorites={refreshFavorites}
+                  />
+                </div>
+                <MapView
+                  locations={filteredLocations}
+                  onLocationHover={handleLocationHover}
+                  hoveredLocation={hoveredLocation}
+                  onViewportChange={handleViewportChange}
+                  refreshFavorites={refreshFavorites}
+                  renderPopupContent={(props) => renderPlannerPopupContent({
+                    ...props,
+                    isLoggedIn,
+                    isFavorited,
+                    toggleFavorite,
+                    isLoadingFavorite,
+                    onAddToDay: showAddToDay
+                  })}
+                />
+              </div>
             )}
             {mobileView === "list" && (
               <ListView
@@ -356,16 +480,28 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 
           {/* Right column: Map view */}
           <div className="w-[40%] h-full relative">
+            <div className="absolute top-2 left-2 z-[1000]">
+              <CategoryFilter 
+                categories={categories.map(cat => cat.name)} 
+                onFilterChange={handleFilterChange}
+                onFavoritesFilterChange={handleFavoritesFilterChange}
+                refreshFavorites={refreshFavorites}
+              />
+            </div>
             <MapView
               locations={filteredLocations}
               onLocationHover={handleLocationHover}
               hoveredLocation={hoveredLocation}
               onViewportChange={handleViewportChange}
               refreshFavorites={refreshFavorites}
-              onAddToDay={showAddToDay}
-              categories={categories.map(cat => cat.name)}
-              onFilterChange={handleFilterChange}
-              onFavoritesFilterChange={handleFavoritesFilterChange}
+              renderPopupContent={(props) => renderPlannerPopupContent({
+                ...props,
+                isLoggedIn,
+                isFavorited,
+                toggleFavorite,
+                isLoadingFavorite,
+                onAddToDay: showAddToDay
+              })}
             />
           </div>
         </div>

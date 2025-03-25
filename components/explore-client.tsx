@@ -11,9 +11,14 @@ import EmptyState from "./empty-state"
 import { MapIcon, ListBulletIcon } from "@heroicons/react/24/outline"
 import { useAuth } from "@/hooks/use-auth"
 import { useFavorites } from "@/hooks/use-favorites"
+import { XMarkIcon } from "@heroicons/react/24/outline"
+import { HeartIcon as HeartSolid } from "@heroicons/react/24/solid"
+import { HeartIcon as HeartOutline } from "@heroicons/react/24/outline"
+import Link from "next/link"
+import Image from "next/image"
 
 // Dynamically import MapView to avoid SSR issues with Leaflet
-const MapView = dynamic(() => import("./explore-map-view"), {
+const MapView = dynamic(() => import("./map-view"), {
   ssr: false,
   loading: () => <div className="h-full w-full bg-gray-100 flex items-center justify-center">Loading map...</div>,
 })
@@ -25,7 +30,7 @@ interface ExploreClientProps {
 
 export default function ExploreClient({ initialLocations, categories }: ExploreClientProps) {
   const { isLoggedIn } = useAuth();
-  const { favorites: userFavorites, refreshFavorites: fetchFavorites } = useFavorites();
+  const { favorites: userFavorites, refreshFavorites: fetchFavorites, toggleFavorite, isFavorited, isLoading: isLoadingFavorite } = useFavorites();
   const [filteredLocations, setFilteredLocations] = useState<LocationData[]>(initialLocations)
   const [hoveredLocation, setHoveredLocation] = useState<LocationData | null>(null)
   const [visibleLocations, setVisibleLocations] = useState<LocationData[]>(initialLocations)
@@ -131,6 +136,89 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
     return visibleLocations;
   }
 
+  // Function to render popup content for the Explore view
+  const renderExplorePopupContent = ({ 
+    location, 
+    isLoggedIn, 
+    isFavorited, 
+    toggleFavorite, 
+    isLoadingFavorite, 
+    onClosePopup,
+    refreshFavorites 
+  }: import("./map-view").PopupContentProps) => {
+    return (
+      <Link 
+        href={`/location/${location.id}`}
+        target="_blank"
+        className="block relative"
+      >
+        <div 
+          className="airbnb-popup-close"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onClosePopup();
+          }}
+        >
+          <XMarkIcon className="w-5 h-5 text-gray-700" />
+        </div>
+        <div className="airbnb-popup-content">
+          <div className="relative w-full h-0 pb-[56.25%]">
+            <Image
+              src={location.images[0] || "/placeholder.svg"}
+              alt={location.name}
+              fill
+              className="object-cover"
+            />
+            <div 
+              className="airbnb-popup-heart" 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                if (!isLoggedIn) {
+                  // Redirect to login if not logged in
+                  window.open('/login', '_blank');
+                  return;
+                }
+                
+                if (isLoadingFavorite[location.id]) return;
+                
+                // Toggle favorite status
+                toggleFavorite(location.id).then(success => {
+                  // Then refresh parent component state if needed
+                  if (success && refreshFavorites) {
+                    refreshFavorites();
+                  }
+                  
+                  // Close popup if removing a favorite in favorites-only mode
+                  if (success && !isFavorited(location.id) && document.querySelector('[data-favorites-filter="true"]')) {
+                    onClosePopup();
+                  }
+                });
+              }}
+              title={isLoggedIn ? (isFavorited(location.id) ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}
+            >
+              {isFavorited(location.id) ? 
+                <HeartSolid className="w-5 h-5 text-red-500" /> : 
+                <HeartOutline className="w-5 h-5 text-gray-700" />
+              }
+            </div>
+          </div>
+          <div className="p-3">
+            <h3 className="font-medium text-lg truncate text-gray-900">{location.name}</h3>
+            <p className="text-sm text-gray-600 line-clamp-2 mt-1">{location.description}</p>
+            <div className="mt-2">
+              <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-800">
+                {location.category}
+              </span>
+            </div>
+          </div>
+        </div>
+      </Link>
+    );
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full">
       {/* Mobile: Toggle between map and list views */}
@@ -154,6 +242,13 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
                   hoveredLocation={hoveredLocation}
                   onViewportChange={handleViewportChange}
                   refreshFavorites={refreshFavorites}
+                  renderPopupContent={(props) => renderExplorePopupContent({
+                    ...props,
+                    isLoggedIn,
+                    isFavorited,
+                    toggleFavorite,
+                    isLoadingFavorite
+                  })}
                 />
               </div>
               
@@ -238,6 +333,13 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
               hoveredLocation={hoveredLocation}
               onViewportChange={handleViewportChange}
               refreshFavorites={refreshFavorites}
+              renderPopupContent={(props) => renderExplorePopupContent({
+                ...props,
+                isLoggedIn,
+                isFavorited,
+                toggleFavorite,
+                isLoadingFavorite
+              })}
             />
           </div>
         </div>

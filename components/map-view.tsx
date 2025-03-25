@@ -2,16 +2,10 @@
 
 import React, { useState, useEffect } from "react"
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, ZoomControl } from "react-leaflet"
-import Link from "next/link"
-import Image from "next/image"
 import "leaflet/dist/leaflet.css"
 import { MAP_CONFIG } from "@/lib/constants"
 import { markerIcon, highlightedMarkerIcon } from "@/lib/marker-icon"
-import type { MapViewProps } from "@/lib/types"
-import { XMarkIcon, HeartIcon as HeartOutline } from "@heroicons/react/24/outline"
-import { HeartIcon as HeartSolid } from "@heroicons/react/24/solid"
-import { useAuth } from "@/hooks/use-auth"
-import { useFavorites } from "@/hooks/use-favorites"
+import type { LocationData, MapViewProps } from "@/lib/types"
 
 // Custom styles for Leaflet popups - we'll add this to override default Leaflet styles
 const customPopupStyles = `
@@ -50,6 +44,21 @@ const customPopupStyles = `
   .airbnb-popup-heart {
     position: absolute;
     left: 8px;
+    top: 8px;
+    background: #FFFFFF;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  .airbnb-popup-add {
+    position: absolute;
+    right: 8px;
     top: 8px;
     background: #FFFFFF;
     border-radius: 50%;
@@ -122,88 +131,25 @@ function ViewportHandler({
   return null
 }
 
-// Custom popup component with Airbnb styling
-function AirbnbStylePopup({ 
-  location, 
-  refreshFavorites 
-}: { 
-  location: MapViewProps['locations'][0],
+// Define PopupContentProps interface
+export interface PopupContentProps {
+  location: LocationData
+  isLoggedIn: boolean
+  isFavorited: (locationId: string) => boolean
+  toggleFavorite: (locationId: string) => Promise<boolean>
+  isLoadingFavorite: Record<string, boolean>
+  onAddToDay?: (location: LocationData) => void
+  onClosePopup: () => void
   refreshFavorites?: () => Promise<void>
-}) {
-  const { isLoggedIn } = useAuth();
-  const { toggleFavorite, isFavorited: checkIsFavorited, isLoading } = useFavorites();
-  const [isFavorited, setIsFavorited] = useState(false);
-  
-  // Check if this location is favorited
-  useEffect(() => {
-    setIsFavorited(checkIsFavorited(location.id));
-  }, [location.id, checkIsFavorited]);
+}
 
-  const handleHeartClick = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (!isLoggedIn) {
-      // Redirect to login if not logged in
-      window.open('/login', '_blank');
-      return;
-    }
-    
-    if (isLoading[location.id]) return;
-    
-    // Toggle favorite status
-    const success = await toggleFavorite(location.id);
-    
-    if (success) {
-      // Update local state for immediate feedback
-      setIsFavorited(!isFavorited);
-      
-      // Then refresh parent component state if needed
-      if (refreshFavorites) {
-        await refreshFavorites();
-      }
-      
-      // Close popup if removing a favorite in favorites-only mode
-      if (!isFavorited && document.querySelector('[data-favorites-filter="true"]')) {
-        const closeButton = document.querySelector('.leaflet-popup-close-button') as HTMLElement;
-        if (closeButton) {
-          closeButton.click();
-        }
-      }
-    }
-  };
-
-  return (
-    <div className="airbnb-popup-content">
-      <div className="relative w-full h-0 pb-[56.25%]">
-        <Image
-          src={location.images[0] || "/placeholder.svg"}
-          alt={location.name}
-          fill
-          className="object-cover"
-        />
-        <div 
-          className="airbnb-popup-heart" 
-          onClick={handleHeartClick}
-          title={isLoggedIn ? (isFavorited ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}
-        >
-          {isFavorited ? 
-            <HeartSolid className="w-5 h-5 text-red-500" /> : 
-            <HeartOutline className="w-5 h-5 text-gray-700" />
-          }
-        </div>
-      </div>
-      <div className="p-3">
-        <h3 className="font-medium text-lg truncate text-gray-900">{location.name}</h3>
-        <p className="text-sm text-gray-600 line-clamp-2 mt-1">{location.description}</p>
-        <div className="mt-2">
-          <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-800">
-            {location.category}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
+// Extended MapViewProps interface with renderPopupContent
+export interface GenericMapViewProps extends MapViewProps {
+  renderPopupContent: (props: PopupContentProps) => React.ReactNode
+  categories?: string[]
+  onFilterChange?: (selectedCategories: string[]) => void
+  onFavoritesFilterChange?: (showOnlyFavorites: boolean) => void
+  onAddToDay?: (location: LocationData) => void
 }
 
 export default function MapView({ 
@@ -211,8 +157,9 @@ export default function MapView({
   onLocationHover, 
   hoveredLocation,
   onViewportChange,
-  refreshFavorites
-}: MapViewProps) {
+  refreshFavorites,
+  renderPopupContent
+}: GenericMapViewProps) {
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
@@ -228,10 +175,7 @@ export default function MapView({
     }
   }, [])
 
-  const handleClosePopup = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
+  const handleClosePopup = () => {
     // Find and close the Leaflet popup by simulating a click on the default close button
     const closeButton = document.querySelector('.leaflet-popup-close-button') as HTMLElement;
     if (closeButton) {
@@ -268,23 +212,15 @@ export default function MapView({
             }}
           >
             <Popup closeButton={true} autoPan={false} offset={[0, -23]}>
-              <Link 
-                href={`/location/${location.id}`}
-                target="_blank"
-                className="block relative"
-              >
-                <div 
-                  className="airbnb-popup-close"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleClosePopup(e);
-                  }}
-                >
-                  <XMarkIcon className="w-5 h-5 text-gray-700" />
-                </div>
-                <AirbnbStylePopup location={location} refreshFavorites={refreshFavorites} />
-              </Link>
+              {renderPopupContent({
+                location,
+                isLoggedIn: false, // This will be overridden by the actual implementation
+                isFavorited: () => false, // This will be overridden by the actual implementation
+                toggleFavorite: async () => false, // This will be overridden by the actual implementation
+                isLoadingFavorite: {},
+                onClosePopup: handleClosePopup,
+                refreshFavorites
+              })}
             </Popup>
           </Marker>
         ))}
