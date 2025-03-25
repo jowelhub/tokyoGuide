@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
@@ -38,6 +38,14 @@ export default function LocationCard({
   linkTarget
 }: LocationCardProps) {
   
+  // Local optimistic state for immediate UI feedback
+  const [optimisticFavorited, setOptimisticFavorited] = useState(isFavorited);
+
+  // Sync local state when the prop changes (after API call completes)
+  useEffect(() => {
+    setOptimisticFavorited(isFavorited);
+  }, [isFavorited]);
+  
   const handleHeartClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -50,8 +58,12 @@ export default function LocationCard({
     
     if (isLoadingFavorite) return;
     
+    // Update local state immediately for instant feedback
+    setOptimisticFavorited(!optimisticFavorited);
+    
     // Call the toggle favorite function passed from parent
     await onToggleFavorite(location.id);
+    // No need to manually revert here, useEffect will sync when the prop updates
   };
 
   const cardContent = (
@@ -97,11 +109,11 @@ export default function LocationCard({
     >
       {/* Heart icon */}
       <div 
-        className="absolute left-2 top-2 bg-white rounded-full w-8 h-8 flex items-center justify-center z-10 cursor-pointer shadow-sm" 
+        className="absolute left-2 top-2 bg-white rounded-full w-8 h-8 flex items-center justify-center z-10 cursor-pointer shadow-sm"
         onClick={handleHeartClick}
-        title={isLoggedIn ? (isFavorited ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}
+        title={isLoggedIn ? (optimisticFavorited ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}
       >
-        {isFavorited ? 
+        {optimisticFavorited ? 
           <HeartSolid className="w-5 h-5 text-red-500" /> : 
           <HeartOutline className="w-5 h-5 text-gray-700" />
         }
