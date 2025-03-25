@@ -352,7 +352,7 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
           <div className="flex-1 overflow-hidden">
             {mobileView === "map" && (
               <div className="relative h-full">
-                <div className="absolute top-2 left-2 z-[1000]">
+                <div className="absolute top-2 left-2 z-10">
                   <CategoryFilter 
                     categories={categories.map(cat => cat.name)} 
                     onFilterChange={handleFilterChange}
@@ -480,7 +480,7 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 
           {/* Right column: Map view */}
           <div className="w-[40%] h-full relative">
-            <div className="absolute top-2 left-2 z-[1000]">
+            <div className="absolute top-2 left-2 z-10">
               <CategoryFilter 
                 categories={categories.map(cat => cat.name)} 
                 onFilterChange={handleFilterChange}

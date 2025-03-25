@@ -50,6 +50,7 @@ export default function PlannerListView({
   const renderActions = (location: LocationData) => (
     <button 
       onClick={(e) => { 
+        e.preventDefault(); 
         e.stopPropagation(); 
         onAddToDay(location); 
       }} 
