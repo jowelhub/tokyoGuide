@@ -7,6 +7,7 @@ import { useMediaQuery } from "@/hooks/use-media-query"
 import type { LocationData } from "@/lib/types"
 import type { CategoryData } from "@/lib/supabase/categories"
 import CategoryFilter from "@/components/category-filter"
+import DayFilter from "@/components/planner/day-filter"
 import ListView from "@/components/planner/planner-list-view"
 import EmptyState from "@/components/empty-state"
 import { MapIcon, ListBulletIcon, CalendarIcon } from "@heroicons/react/24/outline"
@@ -29,6 +30,17 @@ interface PlannerClientProps {
   categories: CategoryData[]
 }
 
+// Helper function to get location IDs from selected days
+const getLocationsFromSelectedDays = (days: ItineraryDay[], selectedDayIds: number[]): Set<string> => {
+  const locationIds = new Set<string>();
+  days.forEach(day => {
+    if (selectedDayIds.includes(day.id)) {
+      day.locations.forEach(loc => locationIds.add(loc.id));
+    }
+  });
+  return locationIds;
+};
+
 interface ItineraryDay {
   id: number
   locations: LocationData[]
@@ -45,6 +57,18 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
   const [mobileView, setMobileView] = useState<"map" | "list" | "plan">("map") // Default to map view on mobile
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const [selectedDayIds, setSelectedDayIds] = useState<number[]>([])
+  
+  const { 
+    days, 
+    setDays, 
+    addDay, 
+    removeDay, 
+    addLocationToDay, 
+    removeLocationFromDay,
+    isLoading: isItineraryLoading,
+    isSaving
+  } = useItinerary();
   
   // Itinerary state
   const [selectedDay, setSelectedDay] = useState<number>(1)
@@ -66,7 +90,7 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
     }
   };
 
-  // Apply filters whenever selectedCategories or showOnlyFavorites changes
+  // Apply filters whenever selectedCategories, showOnlyFavorites, or selectedDayIds changes
   useEffect(() => {
     let newFilteredLocations = initialLocations;
     
@@ -84,8 +108,16 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
       );
     }
     
+    // Apply day filter if any days are selected
+    if (selectedDayIds.length > 0) {
+      const allowedLocationIds = getLocationsFromSelectedDays(days, selectedDayIds);
+      newFilteredLocations = newFilteredLocations.filter(location => 
+        allowedLocationIds.has(location.id)
+      );
+    }
+    
     setFilteredLocations(newFilteredLocations);
-  }, [initialLocations, selectedCategories, showOnlyFavorites, userFavorites]);
+  }, [initialLocations, selectedCategories, showOnlyFavorites, userFavorites, selectedDayIds, days]);
 
   const handleFilterChange = (selectedCategories: string[]) => {
     setSelectedCategories(selectedCategories);
@@ -269,17 +301,6 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
     );
   };
 
-  const { 
-    days, 
-    setDays, 
-    addDay, 
-    removeDay, 
-    addLocationToDay, 
-    removeLocationFromDay,
-    isLoading: isItineraryLoading,
-    isSaving
-  } = useItinerary();
-  
   return (
     <div className="h-full flex flex-col">
       {/* Add to day selector */}
@@ -352,12 +373,17 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
           <div className="flex-1 overflow-hidden">
             {mobileView === "map" && (
               <div className="relative h-full">
-                <div className="absolute top-2 left-2 z-10">
+                <div className="absolute top-2 left-2 z-10 flex space-x-2">
                   <CategoryFilter 
                     categories={categories.map(cat => cat.name)} 
                     onFilterChange={handleFilterChange}
                     onFavoritesFilterChange={handleFavoritesFilterChange}
                     refreshFavorites={refreshFavorites}
+                  />
+                  <DayFilter
+                    days={days}
+                    selectedDayIds={selectedDayIds}
+                    onDayFilterChange={setSelectedDayIds}
                   />
                 </div>
                 <MapView
@@ -480,12 +506,17 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 
           {/* Right column: Map view */}
           <div className="w-[40%] h-full relative">
-            <div className="absolute top-2 left-2 z-10">
+            <div className="absolute top-2 left-2 z-10 flex space-x-2">
               <CategoryFilter 
                 categories={categories.map(cat => cat.name)} 
                 onFilterChange={handleFilterChange}
                 onFavoritesFilterChange={handleFavoritesFilterChange}
                 refreshFavorites={refreshFavorites}
+              />
+              <DayFilter
+                days={days}
+                selectedDayIds={selectedDayIds}
+                onDayFilterChange={setSelectedDayIds}
               />
             </div>
             <MapView
