@@ -241,7 +241,24 @@ export function useItinerary() {
   }, [days]);
 
   const removeDay = useCallback((dayId: number) => {
-    setDays(prev => prev.filter(day => day.id !== dayId));
+    setDays(prev => {
+      // Filter out the day to be removed
+      const remainingDays = prev.filter(day => day.id !== dayId);
+      
+      // If no days left, add a default day 1
+      if (remainingDays.length === 0) {
+        return [{ id: 1, locations: [] }];
+      }
+      
+      // Sort the remaining days by their current id
+      const sortedDays = [...remainingDays].sort((a, b) => a.id - b.id);
+      
+      // Renumber the days sequentially
+      return sortedDays.map((day, index) => ({
+        ...day,
+        id: index + 1
+      }));
+    });
   }, []);
 
   const addLocationToDay = useCallback((dayId: number, location: LocationData) => {

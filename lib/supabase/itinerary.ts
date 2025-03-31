@@ -189,9 +189,15 @@ export async function getItinerary(itineraryId: number): Promise<Itinerary> {
       };
     }
     
+    // Get locations with their categories
     const { data: locations, error: locationsDataError } = await supabase
       .from("locations")
-      .select("*")
+      .select(`
+        *,
+        categories!inner (
+          name
+        )
+      `)
       .in("id", locationIds);
     
     if (locationsDataError) {
@@ -203,7 +209,18 @@ export async function getItinerary(itineraryId: number): Promise<Itinerary> {
     const sortedLocations = (locationRelations || [])
       .map(rel => {
         const location = (locations || []).find(loc => loc.id === rel.location_id);
-        return location;
+        if (location) {
+          // Transform the data to match our LocationData type
+          return {
+            id: location.id,
+            name: location.name,
+            description: location.description,
+            category: location.categories.name,
+            coordinates: [location.latitude, location.longitude] as [number, number],
+            images: Array.isArray(location.images) ? location.images : JSON.parse(location.images)
+          };
+        }
+        return null;
       })
       .filter(Boolean);
     
