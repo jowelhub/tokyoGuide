@@ -117,9 +117,10 @@ function ViewportHandler({
   })
 
   const updateVisibleLocations = () => {
+    if (!map) return
     const bounds = map.getBounds()
     const visibleLocations = locations.filter(location => 
-      bounds.contains(location.coordinates || [location.latitude, location.longitude])
+      bounds.contains(location.coordinates)
     )
     onViewportChange(visibleLocations)
   }
@@ -152,7 +153,7 @@ export interface GenericMapViewProps extends Omit<MapViewProps, 'getMarkerIcon'>
   onFavoritesFilterChange?: (showOnlyFavorites: boolean) => void
   onAddToDay?: (location: LocationData) => void
   locations: LocationData[]
-  hoveredLocation?: LocationData | null
+  hoveredLocation: LocationData | null // Removed the '?' to match the base interface
   locationToDayMap?: Map<string, number> // New prop for planner view
 }
 
@@ -204,8 +205,7 @@ export default function MapView({
   // Debug function to check for invalid locations
   useEffect(() => {
     const invalidLocations = locations.filter(loc => 
-      (!loc.coordinates || loc.coordinates.length !== 2) && 
-      (loc.latitude === undefined || loc.longitude === undefined)
+      !loc.coordinates || loc.coordinates.length !== 2
     );
     
     if (invalidLocations.length > 0) {
@@ -263,7 +263,7 @@ export default function MapView({
           return (
             <Marker
               key={location.id}
-              position={location.coordinates || [location.latitude, location.longitude]}
+              position={location.coordinates}
               icon={icon}
               eventHandlers={{
                 mouseover: () => {
