@@ -2,386 +2,222 @@ import { createClient } from "./client";
 import type { LocationData } from "@/lib/types";
 
 export interface ItineraryDay {
-  id: number;
+  id: number; // Represents the day number (1, 2, 3...)
   locations: LocationData[];
 }
 
-export interface Itinerary {
-  id: number;
+export interface FetchedItinerary {
+  id: number; // The user_itineraries primary key ID
   days: ItineraryDay[];
-  created_at: string;
-  updated_at: string;
 }
 
-/**
- * Save a complete itinerary for the current user.
- * If the user already has an itinerary, it will update it instead.
- * 
- * @param days - Array of itinerary days with locations
- * @returns The ID of the created or updated itinerary
- */
-export async function saveItinerary(days: ItineraryDay[]): Promise<number> {
+export async function getOrCreateUserItinerary(userId: string): Promise<FetchedItinerary> {
   const supabase = createClient();
-  
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    throw new Error("User must be logged in to save itineraries");
-  }
-  
-  // First check if the user already has an itinerary
-  const { data: existingItineraries, error: fetchError } = await supabase
-    .from("user_itineraries")
-    .select("id")
-    .eq("user_id", user.id);
-  
-  if (fetchError) {
-    console.error("Error checking for existing itineraries:", fetchError);
-    throw fetchError;
-  }
-    
-  // If user already has an itinerary, update it instead of creating a new one
-  if (existingItineraries && existingItineraries.length > 0) {
-    return updateItinerary(existingItineraries[0].id, days);
-  }
-  
-  // Create a new itinerary
-  const { data: itinerary, error: itineraryError } = await supabase
-    .from("user_itineraries")
-    .insert({ user_id: user.id })
-    .select("id")
-    .single();
-  
-  if (itineraryError) {
-    console.error("Error creating itinerary:", itineraryError);
-    throw itineraryError;
-  }
-  
-  // Create days for the itinerary
-  for (let i = 0; i < days.length; i++) {
-    const day = days[i];
-    const dayNumber = day.id; // Use the day's actual ID
-    
-    const { data: itineraryDay, error: dayError } = await supabase
-      .from("itinerary_days")
-      .insert({ itinerary_id: itinerary.id, day_number: dayNumber })
+  console.log('[getOrCreateUserItinerary] Fetching/creating itinerary for userId:', userId);
+
+  try {
+    // Try to find an existing itinerary for this user
+    const { data: existingItinerary, error: findError } = await supabase
+      .from("user_itineraries")
       .select("id")
-      .single();
-    
-    if (dayError) {
-      console.error("Error creating day:", dayError);
-      throw dayError;
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (findError) {
+      console.error('[getOrCreateUserItinerary] Error finding itinerary:', findError);
+      throw findError;
     }
-    
-    // Add locations to the day
-    if (day.locations.length > 0) {
-      const locationInserts = day.locations.map((location, index) => ({
-        day_id: itineraryDay.id,
-        location_id: location.id,
-        position: index
-      }));
+
+    if (existingItinerary) {
+      console.log('[getOrCreateUserItinerary] Found existing itinerary ID:', existingItinerary.id);
       
-      const { error: locationsError } = await supabase
+      // Fetch all days for this itinerary
+      const { data: days, error: daysError } = await supabase
+        .from("itinerary_days")
+        .select("id, day_number")
+        .eq("itinerary_id", existingItinerary.id)
+        .order("day_number");
+
+      if (daysError) {
+        console.error('[getOrCreateUserItinerary] Error fetching days:', daysError);
+        throw daysError;
+      }
+
+      if (!days || days.length === 0) {
+        // Return empty days array for an itinerary with no days
+        return { id: existingItinerary.id, days: [] };
+      }
+
+      // Fetch all locations for these days
+      const dayIds = days.map(day => day.id);
+      const { data: itineraryLocations, error: locationsError } = await supabase
         .from("itinerary_locations")
-        .insert(locationInserts);
-      
+        .select("day_id, location_id, position")
+        .in("day_id", dayIds)
+        .order("position");
+
       if (locationsError) {
-        console.error("Error adding locations:", locationsError);
+        console.error('[getOrCreateUserItinerary] Error fetching itinerary locations:', locationsError);
         throw locationsError;
       }
-    }
-  }
-  
-  return itinerary.id;
-}
 
-/**
- * Get all itineraries for the current user
- * 
- * @returns Array of user itineraries
- */
-export async function getUserItineraries(): Promise<Itinerary[]> {
-  const supabase = createClient();
-  
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    return []; // Return empty array if not logged in
-  }
-  
-  const { data: itineraries, error: itinerariesError } = await supabase
-    .from("user_itineraries")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
-  
-  if (itinerariesError) {
-    console.error("Error fetching user itineraries:", itinerariesError);
-    return [];
-  }
-  
-  return itineraries || [];
-}
+      // Extract all unique location IDs
+      const locationIds = [...new Set(itineraryLocations?.map(item => item.location_id) || [])];
+      
+      let locationMap = new Map();
+      
+      if (locationIds.length > 0) {
+        // Fetch all location data for these location IDs
+        const { data: locations, error: fullLocationsError } = await supabase
+          .from("locations")
+          .select(`
+            *,
+            categories!inner (
+              name
+            )
+          `)
+          .in("id", locationIds);
 
-/**
- * Get a specific itinerary with all its days and locations
- * 
- * @param itineraryId - The ID of the itinerary to retrieve
- * @returns The complete itinerary with days and locations
- */
-export async function getItinerary(itineraryId: number): Promise<Itinerary> {
-  const supabase = createClient();
-  
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    throw new Error("User must be logged in to view itineraries");
-  }
-  
-  // Get the itinerary
-  const { data: itinerary, error: itineraryError } = await supabase
-    .from("user_itineraries")
-    .select("*")
-    .eq("id", itineraryId)
-    .eq("user_id", user.id)
-    .single();
-  
-  if (itineraryError) {
-    console.error("Error fetching itinerary:", itineraryError);
-    throw itineraryError;
-  }
-  
-  // Get all days for this itinerary
-  const { data: days, error: daysError } = await supabase
-    .from("itinerary_days")
-    .select("*")
-    .eq("itinerary_id", itineraryId)
-    .order("day_number", { ascending: true });
-  
-  if (daysError) {
-    console.error("Error fetching days:", daysError);
-    throw daysError;
-  }
-  
-  // For each day, get its locations
-  const daysWithLocations = await Promise.all((days || []).map(async (day) => {
-    const { data: locationRelations, error: locationsError } = await supabase
-      .from("itinerary_locations")
-      .select("location_id, position")
-      .eq("day_id", day.id)
-      .order("position", { ascending: true });
-    
-    if (locationsError) {
-      console.error("Error fetching location relations:", locationsError);
-      throw locationsError;
-    }
-    
-    // Get the full location data for each location ID
-    const locationIds = (locationRelations || []).map(rel => rel.location_id);
-    
-    if (locationIds.length === 0) {
-      return {
-        id: day.day_number,
-        locations: []
-      };
-    }
-    
-    // Get locations with their categories
-    const { data: locations, error: locationsDataError } = await supabase
-      .from("locations")
-      .select(`
-        *,
-        categories!inner (
-          name
-        )
-      `)
-      .in("id", locationIds);
-    
-    if (locationsDataError) {
-      console.error("Error fetching locations:", locationsDataError);
-      throw locationsDataError;
-    }
-    
-    // Sort locations based on their position in the day
-    const sortedLocations = (locationRelations || [])
-      .map(rel => {
-        const location = (locations || []).find(loc => loc.id === rel.location_id);
-        if (location) {
-          // Transform the data to match our LocationData type
-          return {
+        if (fullLocationsError) {
+          console.error('[getOrCreateUserItinerary] Error fetching location details:', fullLocationsError);
+          throw fullLocationsError;
+        }
+
+        // Transform location data to match LocationData type
+        locations?.forEach(location => {
+          locationMap.set(location.id, {
             id: location.id,
             name: location.name,
             description: location.description,
             category: location.categories.name,
             coordinates: [location.latitude, location.longitude] as [number, number],
             images: Array.isArray(location.images) ? location.images : JSON.parse(location.images)
-          };
-        }
-        return null;
-      })
-      .filter(Boolean);
-    
-    return {
-      id: day.day_number,
-      locations: sortedLocations
-    };
-  }));
-  
-  return {
-    ...itinerary,
-    days: daysWithLocations
-  };
-}
+          });
+        });
+      }
 
-/**
- * Delete an itinerary and all its associated data
- * 
- * @param itineraryId - The ID of the itinerary to delete
- * @returns true if successful
- */
-export async function deleteItinerary(itineraryId: number): Promise<boolean> {
-  const supabase = createClient();
-  
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    throw new Error("User must be logged in to delete itineraries");
-  }
-  
-  // Check if the itinerary belongs to the user
-  const { data, error: checkError } = await supabase
-    .from("user_itineraries")
-    .select("id")
-    .eq("id", itineraryId)
-    .eq("user_id", user.id)
-    .single();
-  
-  if (checkError) {
-    console.error("Error checking itinerary ownership:", checkError);
-    throw checkError;
-  }
-  
-  // Delete the itinerary (cascade will delete days and locations)
-  const { error: deleteError } = await supabase
-    .from("user_itineraries")
-    .delete()
-    .eq("id", itineraryId);
-  
-  if (deleteError) {
-    console.error("Error deleting itinerary:", deleteError);
-    throw deleteError;
-  }
-  
-  return true;
-}
+      // Assemble the days array with their locations
+      const assembledDays: ItineraryDay[] = days.map(day => {
+        const dayLocations = itineraryLocations
+          ?.filter(item => item.day_id === day.id)
+          .map(item => locationMap.get(item.location_id))
+          .filter(Boolean); // Remove any undefined locations
+        
+        return {
+          id: day.day_number,
+          locations: dayLocations || []
+        };
+      });
 
-/**
- * Update an existing itinerary with new data
- * 
- * @param itineraryId - The ID of the itinerary to update
- * @param days - The updated array of days and locations
- * @returns The ID of the updated itinerary
- */
-export async function updateItinerary(itineraryId: number, days: ItineraryDay[]): Promise<number> {
-  const supabase = createClient();
-  
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    throw new Error("User must be logged in to update itineraries");
-  }
-  
-  // Check if the itinerary belongs to the user
-  const { data: existingItinerary, error: checkError } = await supabase
-    .from("user_itineraries")
-    .select("id")
-    .eq("id", itineraryId)
-    .eq("user_id", user.id)
-    .single();
-  
-  if (checkError) {
-    console.error("Error checking itinerary ownership:", checkError);
-    throw checkError;
-  }
-  
-  // Update the itinerary timestamp
-  const { error: updateError } = await supabase
-    .from("user_itineraries")
-    .update({ 
-      updated_at: new Date().toISOString() 
-    })
-    .eq("id", itineraryId);
-  
-  if (updateError) {
-    console.error("Error updating itinerary:", updateError);
-    throw updateError;
-  }
-  
-  // Get all existing days for this itinerary
-  const { data: existingDays, error: daysError } = await supabase
-    .from("itinerary_days")
-    .select("id, day_number")
-    .eq("itinerary_id", itineraryId);
-  
-  if (daysError) {
-    console.error("Error fetching existing days:", daysError);
-    throw daysError;
-  }
-  
-  // Delete all existing days and their locations (we'll recreate them)
-  if (existingDays && existingDays.length > 0) {
-    const dayIdsToDelete = existingDays.map(day => day.id);
-    
-    const { error: deleteDaysError } = await supabase
-      .from("itinerary_days")
-      .delete()
-      .in("id", dayIdsToDelete);
-    
-    if (deleteDaysError) {
-      console.error("Error deleting existing days:", deleteDaysError);
-      throw deleteDaysError;
+      console.log('[getOrCreateUserItinerary] Assembled existing days:', JSON.stringify(assembledDays, null, 2));
+      return { id: existingItinerary.id, days: assembledDays };
     }
-  }
-  
-  // Create days for the itinerary
-  for (let i = 0; i < days.length; i++) {
-    const day = days[i];
-    const dayNumber = day.id; // Use the day's actual ID
+
+    // No existing itinerary found, create a new one
+    console.log('[getOrCreateUserItinerary] No existing itinerary found, creating new one.');
     
-    const { data: itineraryDay, error: dayError } = await supabase
-      .from("itinerary_days")
-      .insert({ itinerary_id: itineraryId, day_number: dayNumber })
-      .select("id")
+    // Insert new itinerary
+    const { data: newItinerary, error: insertError } = await supabase
+      .from("user_itineraries")
+      .insert({ user_id: userId })
+      .select('id')
       .single();
-    
+
+    if (insertError) {
+      console.error('[getOrCreateUserItinerary] Error creating itinerary:', insertError);
+      throw insertError;
+    }
+
+    const itineraryId = newItinerary.id;
+
+    // Insert default first day
+    const { error: dayError } = await supabase
+      .from("itinerary_days")
+      .insert({ itinerary_id: itineraryId, day_number: 1 });
+
     if (dayError) {
-      console.error("Error creating day:", dayError);
+      console.error('[getOrCreateUserItinerary] Error creating default day:', dayError);
       throw dayError;
     }
-    
-    // Add locations to the day
-    if (day.locations.length > 0) {
-      const locationInserts = day.locations.map((location, index) => ({
-        day_id: itineraryDay.id,
-        location_id: location.id,
-        position: index
-      }));
-      
-      const { error: locationsError } = await supabase
-        .from("itinerary_locations")
-        .insert(locationInserts);
-      
-      if (locationsError) {
-        console.error("Error adding locations:", locationsError);
-        throw locationsError;
+
+    console.log('[getOrCreateUserItinerary] Created new itinerary ID:', itineraryId);
+    return { id: itineraryId, days: [{ id: 1, locations: [] }] };
+
+  } catch (error) {
+    console.error('[getOrCreateUserItinerary] Unexpected error:', error);
+    throw error;
+  }
+}
+
+export async function updateUserItinerary(itineraryId: number, days: ItineraryDay[]): Promise<boolean> {
+  const supabase = createClient();
+  console.log(`[updateUserItinerary] Updating itineraryId: ${itineraryId} with days:`, JSON.stringify(days, null, 2));
+
+  try {
+    // Delete all existing days (cascade will handle locations)
+    const { error: deleteError } = await supabase
+      .from("itinerary_days")
+      .delete()
+      .eq("itinerary_id", itineraryId);
+
+    if (deleteError) {
+      console.error('[updateUserItinerary] Error deleting existing days:', deleteError);
+      return false;
+    }
+
+    // Insert all new days and their locations
+    for (const day of days) {
+      // Insert new day
+      const { data: newDay, error: dayError } = await supabase
+        .from("itinerary_days")
+        .insert({ itinerary_id: itineraryId, day_number: day.id })
+        .select('id')
+        .single();
+
+      if (dayError) {
+        console.error(`[updateUserItinerary] Error inserting day ${day.id}:`, dayError);
+        return false;
+      }
+
+      const dayRecordId = newDay.id;
+      console.log(`[updateUserItinerary] Inserted day ${day.id} with record ID ${dayRecordId}`);
+
+      // If this day has locations, insert them
+      if (day.locations && day.locations.length > 0) {
+        const locationInserts = day.locations.map((loc, index) => ({
+          day_id: dayRecordId,
+          location_id: loc.id,
+          position: index
+        }));
+
+        const { error: locError } = await supabase
+          .from("itinerary_locations")
+          .insert(locationInserts);
+
+        if (locError) {
+          console.error(`[updateUserItinerary] Error inserting locations for day ${day.id}:`, locError);
+          return false;
+        }
+
+        console.log(`[updateUserItinerary] Inserted ${locationInserts.length} locations for day ${day.id}`);
       }
     }
+
+    // Update the timestamp on the itinerary
+    const { error: updateError } = await supabase
+      .from("user_itineraries")
+      .update({ updated_at: new Date() })
+      .eq("id", itineraryId);
+
+    if (updateError) {
+      console.error('[updateUserItinerary] Error updating timestamp:', updateError);
+      // Non-fatal error, continue
+    }
+
+    console.log('[updateUserItinerary] Successfully updated itinerary');
+    return true;
+  } catch (error) {
+    console.error('[updateUserItinerary] Unexpected error:', error);
+    return false;
   }
-  
-  return itineraryId;
 }
