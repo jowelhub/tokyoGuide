@@ -4,7 +4,6 @@ import React, { useState, useEffect } from "react"
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, ZoomControl } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
 import { MAP_CONFIG } from "@/lib/constants"
-import { markerIcon, highlightedMarkerIcon } from "@/lib/marker-icon"
 import type { LocationData, MapViewProps } from "@/lib/types"
 import L from "leaflet"
 
@@ -223,6 +222,18 @@ export default function MapView({
             key={location.id}
             position={location.coordinates || [location.latitude, location.longitude]}
             icon={getMarkerIcon(location, hoveredLocation?.id === location.id)}
+            eventHandlers={{
+              mouseover: () => {
+                if (onLocationHover) {
+                  onLocationHover(location);
+                }
+              },
+              mouseout: () => {
+                if (onLocationHover && hoveredLocation?.id === location.id) {
+                  onLocationHover(null);
+                }
+              },
+            }}
           >
             <Popup closeButton={true} autoPan={false} offset={[0, -23]}>
               {renderPopupContent({

@@ -7,14 +7,13 @@ export const MAP_CONFIG = {
     '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
 } as const;
 
-// Marker icon configuration
-export const MARKER_ICON_CONFIG = {
-  iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
-  iconRetinaUrl:
-    'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
-  iconSize: [25, 41] as [number, number],
-  iconAnchor: [12, 41] as [number, number],
-  tooltipAnchor: [0, -46] as [number, number],
-  shadowSize: [41, 41] as [number, number],
+// Enhanced marker configuration for SVG markers
+export const MARKER_CONFIG = {
+  defaultSize: 45, // Base size in pixels
+  highlightScale: 1.1, // Scale factor for highlighted markers (~10% bigger)
+  defaultColor: '#3b82f6', // Default blue color (Tailwind blue-500)
+  defaultHighlightColor: '#1D4ED8', // Darker blue (Tailwind blue-700)
+  plannerColor: '#f97316', // Orange color (Tailwind orange-500)
+  plannerHighlightColor: '#ea580c', // Darker orange (Tailwind orange-700)
+  textColor: '#ffffff', // Color for text/circle inside the pin
 };

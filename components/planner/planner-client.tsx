@@ -18,7 +18,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { useFavorites } from "@/hooks/use-favorites"
 import { useItinerary } from "@/hooks/use-itinerary"
 import Image from "next/image"
-import { getMarkerIcon, getHighlightedMarkerIcon, createNumberedMarkerIcon } from "@/lib/marker-icon"
+import { generateMarkerIcon } from "@/lib/marker-icon"
 import L from "leaflet"
 
 // Dynamically import MapView to avoid SSR issues with Leaflet
@@ -90,14 +90,7 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 
   const getPlannerMarkerIcon = (location: LocationData, isHovered: boolean): L.DivIcon => {
     const dayNumber = locationToDayMap.get(location.id);
-
-    if (dayNumber !== undefined) {
-      // Location is in the itinerary, use numbered icon
-      return createNumberedMarkerIcon(dayNumber, isHovered);
-    } else {
-      // Location is not in the itinerary, use default icon
-      return isHovered ? getHighlightedMarkerIcon() : getMarkerIcon();
-    }
+    return generateMarkerIcon(isHovered, dayNumber) ?? new L.DivIcon();
   };
 
   // Function to refresh favorites - will be passed to child components
