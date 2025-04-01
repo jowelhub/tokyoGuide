@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from "react"
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, ZoomControl } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
-import { MAP_CONFIG } from "@/lib/constants"
-import type { LocationData, MapViewProps } from "@/lib/types"
 import L from "leaflet"
+import { MAP_CONFIG, MARKER_CONFIG } from "@/lib/constants"
+import { createMarkerSvg } from "@/lib/marker-icon"
+import type { LocationData, MapViewProps } from "@/lib/types"
 
 // Custom styles for Leaflet popups - we'll add this to override default Leaflet styles
 const customPopupStyles = `
@@ -144,7 +145,7 @@ export interface PopupContentProps {
 }
 
 // Extended MapViewProps interface with renderPopupContent
-export interface GenericMapViewProps extends MapViewProps {
+export interface GenericMapViewProps extends Omit<MapViewProps, 'getMarkerIcon'> {
   renderPopupContent: (props: PopupContentProps) => React.ReactNode
   categories?: string[]
   onFilterChange?: (selectedCategories: string[]) => void
@@ -152,7 +153,7 @@ export interface GenericMapViewProps extends MapViewProps {
   onAddToDay?: (location: LocationData) => void
   locations: LocationData[]
   hoveredLocation?: LocationData | null
-  getMarkerIcon: (location: LocationData, isHovered: boolean) => L.DivIcon
+  locationToDayMap?: Map<string, number> // New prop for planner view
 }
 
 export default function MapView({ 
@@ -162,9 +163,43 @@ export default function MapView({
   onViewportChange,
   refreshFavorites,
   renderPopupContent,
-  getMarkerIcon
+  locationToDayMap
 }: GenericMapViewProps) {
   const [isMounted, setIsMounted] = useState(false)
+
+  // Internal helper function to generate icons (moved from lib/marker-icon.ts)
+  const generateInternalMarkerIcon = (isHovered: boolean, dayNumber?: number): L.DivIcon => {
+    const isPlanner = dayNumber !== undefined;
+    const baseSize = MARKER_CONFIG.defaultSize;
+    const size = isHovered ? Math.floor(baseSize * MARKER_CONFIG.highlightScale) : baseSize;
+    
+    // Determine color based on marker type and hover state
+    let color: string;
+    if (isPlanner) {
+      // Planner markers use orange colors
+      color = isHovered ? MARKER_CONFIG.plannerHighlightColor : MARKER_CONFIG.plannerColor;
+    } else {
+      // Default markers use blue colors
+      color = isHovered ? MARKER_CONFIG.defaultHighlightColor : MARKER_CONFIG.defaultColor;
+    }
+
+    // Generate SVG HTML
+    const svgMarkup = createMarkerSvg(size, color, dayNumber);
+    
+    // Calculate anchors based on size and configurable ratio
+    const iconAnchor: [number, number] = [size / 2, size * MARKER_CONFIG.anchorRatioY]; 
+    const popupAnchor: [number, number] = [0, -size * 0.09]; 
+    const tooltipAnchor: [number, number] = [0, -size * 0.73];
+    
+    return new L.DivIcon({
+      html: svgMarkup,
+      className: isHovered ? 'custom-marker-icon-highlighted' : 'custom-marker-icon',
+      iconSize: [size, size],
+      iconAnchor,
+      popupAnchor,
+      tooltipAnchor
+    });
+  }
   
   // Debug function to check for invalid locations
   useEffect(() => {
@@ -217,37 +252,46 @@ export default function MapView({
           attribution={MAP_CONFIG.attribution}
           url={MAP_CONFIG.tileLayerUrl}
         />
-        {locations.map((location) => (
-          <Marker
-            key={location.id}
-            position={location.coordinates || [location.latitude, location.longitude]}
-            icon={getMarkerIcon(location, hoveredLocation?.id === location.id)}
-            eventHandlers={{
-              mouseover: () => {
-                if (onLocationHover) {
-                  onLocationHover(location);
-                }
-              },
-              mouseout: () => {
-                if (onLocationHover && hoveredLocation?.id === location.id) {
-                  onLocationHover(null);
-                }
-              },
-            }}
-          >
-            <Popup closeButton={true} autoPan={false} offset={[0, -23]}>
-              {renderPopupContent({
-                location,
-                isLoggedIn: false, // This will be overridden by the actual implementation
-                isFavorited: () => false, // This will be overridden by the actual implementation
-                toggleFavorite: async () => false, // This will be overridden by the actual implementation
-                isLoadingFavorite: {},
-                onClosePopup: handleClosePopup,
-                refreshFavorites
-              })}
-            </Popup>
-          </Marker>
-        ))}
+        {locations.map((location) => {
+          // Determine hover state and day number
+          const isHovered = hoveredLocation?.id === location.id;
+          const dayNumber = locationToDayMap?.get(location.id);
+          
+          // Generate icon internally
+          const icon = generateInternalMarkerIcon(isHovered, dayNumber);
+          
+          return (
+            <Marker
+              key={location.id}
+              position={location.coordinates || [location.latitude, location.longitude]}
+              icon={icon}
+              eventHandlers={{
+                mouseover: () => {
+                  if (onLocationHover) {
+                    onLocationHover(location);
+                  }
+                },
+                mouseout: () => {
+                  if (onLocationHover && hoveredLocation?.id === location.id) {
+                    onLocationHover(null);
+                  }
+                },
+              }}
+            >
+              <Popup closeButton={true} autoPan={false} offset={[0, -23]}>
+                {renderPopupContent({
+                  location,
+                  isLoggedIn: false, // This will be overridden by the actual implementation
+                  isFavorited: () => false, // This will be overridden by the actual implementation
+                  toggleFavorite: async () => false, // This will be overridden by the actual implementation
+                  isLoadingFavorite: {},
+                  onClosePopup: handleClosePopup,
+                  refreshFavorites
+                })}
+              </Popup>
+            </Marker>
+          );
+        })}
         <ViewportHandler locations={locations} onViewportChange={onViewportChange} />
       </MapContainer>
     </div>

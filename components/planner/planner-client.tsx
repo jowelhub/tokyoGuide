@@ -18,8 +18,6 @@ import { useAuth } from "@/hooks/use-auth"
 import { useFavorites } from "@/hooks/use-favorites"
 import { useItinerary } from "@/hooks/use-itinerary"
 import Image from "next/image"
-import { generateMarkerIcon } from "@/lib/marker-icon"
-import L from "leaflet"
 
 // Dynamically import MapView to avoid SSR issues with Leaflet
 const MapView = dynamic(() => import("@/components/map-view"), {
@@ -87,11 +85,6 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
     });
     return map;
   }, [days]);
-
-  const getPlannerMarkerIcon = (location: LocationData, isHovered: boolean): L.DivIcon => {
-    const dayNumber = locationToDayMap.get(location.id);
-    return generateMarkerIcon(isHovered, dayNumber) ?? new L.DivIcon();
-  };
 
   // Function to refresh favorites - will be passed to child components
   const refreshFavorites = async () => {
@@ -418,7 +411,7 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
                     isLoadingFavorite,
                     onAddToDay: showAddToDay
                   })}
-                  getMarkerIcon={getPlannerMarkerIcon}
+                  locationToDayMap={locationToDayMap} // Pass the map instead of a function
                 />
               </div>
             )}
@@ -552,7 +545,7 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
                 isLoadingFavorite,
                 onAddToDay: showAddToDay
               })}
-              getMarkerIcon={getPlannerMarkerIcon}
+              locationToDayMap={locationToDayMap} // Pass the map instead of a function
             />
           </div>
         </div>

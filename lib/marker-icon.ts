@@ -1,11 +1,10 @@
-// Since we're using PageClient, we can safely import Leaflet
-import L from "leaflet"
 import { MARKER_CONFIG } from "@/lib/constants"
 
 /**
  * Creates a marker SVG string with the specified parameters
+ * This function has no dependencies on browser APIs or Leaflet
  */
-function createMarkerSvg(
+export function createMarkerSvg(
   size: number,
   color: string,
   number?: number
@@ -44,48 +43,4 @@ function createMarkerSvg(
     ${innerContent}
   </svg>
   `;
-}
-
-/**
- * Generates a marker icon with appropriate styling based on parameters
- */
-export function generateMarkerIcon(
-  isHovered: boolean = false,
-  dayNumber?: number
-): L.DivIcon | null {
-  // Server-side rendering check
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  
-  const isPlanner = dayNumber !== undefined;
-  const baseSize = MARKER_CONFIG.defaultSize;
-  const size = isHovered ? Math.floor(baseSize * MARKER_CONFIG.highlightScale) : baseSize;
-  
-  // Determine color based on marker type and hover state
-  let color: string;
-  if (isPlanner) {
-    // Planner markers use orange colors
-    color = isHovered ? MARKER_CONFIG.plannerHighlightColor : MARKER_CONFIG.plannerColor;
-  } else {
-    // Default markers use blue colors
-    color = isHovered ? MARKER_CONFIG.defaultHighlightColor : MARKER_CONFIG.defaultColor;
-  }
-
-  // Generate SVG HTML
-  const svgMarkup = createMarkerSvg(size, color, dayNumber);
-  
-  // Calculate anchors based on size
-  const iconAnchor: [number, number] = [size / 2, size * 0.82]; // Position at bottom middle of the pin
-  const popupAnchor: [number, number] = [0, -size * 0.09]; // Position popup above pin
-  const tooltipAnchor: [number, number] = [0, -size * 0.73]; // Position tooltip above pin
-  
-  return new L.DivIcon({
-    html: svgMarkup,
-    className: isHovered ? 'custom-marker-icon-highlighted' : 'custom-marker-icon',
-    iconSize: [size, size],
-    iconAnchor,
-    popupAnchor,
-    tooltipAnchor
-  });
 }

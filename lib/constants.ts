@@ -11,6 +11,7 @@ export const MAP_CONFIG = {
 export const MARKER_CONFIG = {
   defaultSize: 45, // Base size in pixels
   highlightScale: 1.1, // Scale factor for highlighted markers (~10% bigger)
+  anchorRatioY: 1.0, // Ratio for vertical anchor point (higher = pin appears higher above the coordinate)
   defaultColor: '#3b82f6', // Default blue color (Tailwind blue-500)
   defaultHighlightColor: '#1D4ED8', // Darker blue (Tailwind blue-700)
   plannerColor: '#f97316', // Orange color (Tailwind orange-500)

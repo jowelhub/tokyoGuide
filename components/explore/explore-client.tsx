@@ -16,8 +16,6 @@ import { HeartIcon as HeartSolid } from "@heroicons/react/24/solid"
 import { HeartIcon as HeartOutline } from "@heroicons/react/24/outline"
 import Link from "next/link"
 import Image from "next/image"
-import { generateMarkerIcon } from "@/lib/marker-icon"
-import L from "leaflet"
 
 // Dynamically import MapView to avoid SSR issues with Leaflet
 const MapView = dynamic(() => import("../map-view"), {
@@ -40,10 +38,6 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
   const [mobileView, setMobileView] = useState<"map" | "list">("map") // Default to map view on mobile
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
-
-  const getExploreMarkerIcon = (location: LocationData, isHovered: boolean): L.DivIcon => {
-    return generateMarkerIcon(isHovered) ?? new L.DivIcon();
-  };
 
   // Function to refresh favorites - will be passed to child components
   const refreshFavorites = async () => {
@@ -255,7 +249,6 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
                     toggleFavorite,
                     isLoadingFavorite
                   })}
-                  getMarkerIcon={getExploreMarkerIcon}
                 />
               </div>
               
@@ -347,7 +340,6 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
                 toggleFavorite,
                 isLoadingFavorite
               })}
-              getMarkerIcon={getExploreMarkerIcon}
             />
           </div>
         </div>
