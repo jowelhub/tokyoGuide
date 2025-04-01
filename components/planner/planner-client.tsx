@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import dynamic from "next/dynamic"
 import Link from "next/link"
 import { useMediaQuery } from "@/hooks/use-media-query"
@@ -18,6 +18,8 @@ import { useAuth } from "@/hooks/use-auth"
 import { useFavorites } from "@/hooks/use-favorites"
 import { useItinerary } from "@/hooks/use-itinerary"
 import Image from "next/image"
+import { getMarkerIcon, getHighlightedMarkerIcon, createNumberedMarkerIcon } from "@/lib/marker-icon"
+import L from "leaflet"
 
 // Dynamically import MapView to avoid SSR issues with Leaflet
 const MapView = dynamic(() => import("@/components/map-view"), {
@@ -74,6 +76,29 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
   const [selectedDay, setSelectedDay] = useState<number>(1)
   const [showDaySelector, setShowDaySelector] = useState<boolean>(false)
   const [locationToAdd, setLocationToAdd] = useState<LocationData | null>(null)
+
+  // Create a map of location IDs to day numbers for efficient lookup
+  const locationToDayMap = useMemo(() => {
+    const map = new Map<string, number>();
+    days.forEach(day => {
+      day.locations.forEach(loc => {
+        map.set(loc.id, day.id);
+      });
+    });
+    return map;
+  }, [days]);
+
+  const getPlannerMarkerIcon = (location: LocationData, isHovered: boolean): L.DivIcon => {
+    const dayNumber = locationToDayMap.get(location.id);
+
+    if (dayNumber !== undefined) {
+      // Location is in the itinerary, use numbered icon
+      return createNumberedMarkerIcon(dayNumber, isHovered);
+    } else {
+      // Location is not in the itinerary, use default icon
+      return isHovered ? getHighlightedMarkerIcon() : getMarkerIcon();
+    }
+  };
 
   // Function to refresh favorites - will be passed to child components
   const refreshFavorites = async () => {
@@ -400,6 +425,7 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
                     isLoadingFavorite,
                     onAddToDay: showAddToDay
                   })}
+                  getMarkerIcon={getPlannerMarkerIcon}
                 />
               </div>
             )}
@@ -533,6 +559,7 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
                 isLoadingFavorite,
                 onAddToDay: showAddToDay
               })}
+              getMarkerIcon={getPlannerMarkerIcon}
             />
           </div>
         </div>

@@ -235,10 +235,19 @@ export function useItinerary() {
 
   // Day management functions
   const addDay = useCallback(() => {
-    const newDayId = days.length > 0 ? Math.max(...days.map(day => day.id)) + 1 : 1;
-    setDays(prev => [...prev, { id: newDayId, locations: [] }]);
-    return newDayId;
-  }, [days]);
+    // Prevent adding more than 99 days
+    if (days.length >= 99) {
+      return;
+    }
+
+    setDays(prev => [
+      ...prev,
+      {
+        id: prev.length + 1,
+        locations: []
+      }
+    ]);
+  }, [days.length]);
 
   const removeDay = useCallback((dayId: number) => {
     setDays(prev => {

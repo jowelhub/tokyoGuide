@@ -6,6 +6,7 @@ import "leaflet/dist/leaflet.css"
 import { MAP_CONFIG } from "@/lib/constants"
 import { markerIcon, highlightedMarkerIcon } from "@/lib/marker-icon"
 import type { LocationData, MapViewProps } from "@/lib/types"
+import L from "leaflet"
 
 // Custom styles for Leaflet popups - we'll add this to override default Leaflet styles
 const customPopupStyles = `
@@ -118,7 +119,7 @@ function ViewportHandler({
   const updateVisibleLocations = () => {
     const bounds = map.getBounds()
     const visibleLocations = locations.filter(location => 
-      bounds.contains([location.coordinates[0], location.coordinates[1]])
+      bounds.contains(location.coordinates || [location.latitude, location.longitude])
     )
     onViewportChange(visibleLocations)
   }
@@ -150,6 +151,9 @@ export interface GenericMapViewProps extends MapViewProps {
   onFilterChange?: (selectedCategories: string[]) => void
   onFavoritesFilterChange?: (showOnlyFavorites: boolean) => void
   onAddToDay?: (location: LocationData) => void
+  locations: LocationData[]
+  hoveredLocation?: LocationData | null
+  getMarkerIcon: (location: LocationData, isHovered: boolean) => L.DivIcon
 }
 
 export default function MapView({ 
@@ -158,9 +162,22 @@ export default function MapView({
   hoveredLocation,
   onViewportChange,
   refreshFavorites,
-  renderPopupContent
+  renderPopupContent,
+  getMarkerIcon
 }: GenericMapViewProps) {
   const [isMounted, setIsMounted] = useState(false)
+  
+  // Debug function to check for invalid locations
+  useEffect(() => {
+    const invalidLocations = locations.filter(loc => 
+      (!loc.coordinates || loc.coordinates.length !== 2) && 
+      (loc.latitude === undefined || loc.longitude === undefined)
+    );
+    
+    if (invalidLocations.length > 0) {
+      console.warn('Found invalid locations:', invalidLocations);
+    }
+  }, [locations]);
 
   useEffect(() => {
     setIsMounted(true)
@@ -204,12 +221,8 @@ export default function MapView({
         {locations.map((location) => (
           <Marker
             key={location.id}
-            position={location.coordinates}
-            icon={hoveredLocation?.id === location.id ? highlightedMarkerIcon : markerIcon}
-            eventHandlers={{
-              mouseover: () => onLocationHover(location),
-              mouseout: () => onLocationHover(null),
-            }}
+            position={location.coordinates || [location.latitude, location.longitude]}
+            icon={getMarkerIcon(location, hoveredLocation?.id === location.id)}
           >
             <Popup closeButton={true} autoPan={false} offset={[0, -23]}>
               {renderPopupContent({
