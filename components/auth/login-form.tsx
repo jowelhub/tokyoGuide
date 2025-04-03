@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/hooks/use-auth";
 
 export function LoginForm() {
   const [email, setEmail] = useState("");
@@ -15,7 +15,7 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const supabase = createClient();
+  const { refreshUser } = useAuth();
   const isRegistered = searchParams.get("registered") === "true";
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -24,16 +24,25 @@ export function LoginForm() {
     setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email, password })
       });
-      if (error) {
-        setError(error.message);
-      } else {
-        router.push("/explore");
-        router.refresh();
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        setError(data.error || 'Failed to sign in');
+        return;
       }
+      
+      // Refresh the user state
+      await refreshUser();
+      router.push("/explore");
+      router.refresh();
     } catch (err) {
       setError("An unexpected error occurred");
       console.error("Login error:", err);
@@ -47,12 +56,21 @@ export function LoginForm() {
     setError(null);
     
     try {
+      // For OAuth, we still need to use the browser client
+      // Use dynamic import to only load it when needed
+      const { createBrowserClient } = await import("@supabase/ssr");
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
+      
       if (error) {
         setError(error.message);
       }

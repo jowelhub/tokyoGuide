@@ -3,30 +3,41 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/hooks/use-auth";
 
 export function RegisterForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const router = useRouter();
-  const supabase = createClient();
+  const { refreshUser } = useAuth();
   
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError(null);
+    setWarning(null);
     
     try {
+      // For OAuth, we still need to use the browser client
+      // Use dynamic import to only load it when needed
+      const { createBrowserClient } = await import("@supabase/ssr");
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
+      
       if (error) {
         setError(error.message);
       }
@@ -42,28 +53,32 @@ export function RegisterForm() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setWarning(null);
 
     try {
-      // First sign up the user
-      const { error: signUpError } = await supabase.auth.signUp({ email, password });
-      if (signUpError) {
-        setError(signUpError.message);
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email, password })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        setError(data.error || 'Failed to register');
         return;
       }
       
-      // Then automatically sign in the user
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      
-      if (signInError) {
-        setError(signInError.message);
-      } else {
-        // Redirect to explore page, just like after login
-        router.push("/explore");
-        router.refresh();
+      if (data.warning) {
+        setWarning(data.warning);
       }
+      
+      // Refresh the user state
+      await refreshUser();
+      router.push("/explore");
+      router.refresh();
     } catch (err) {
       setError("An unexpected error occurred");
       console.error("Registration error:", err);
@@ -82,6 +97,12 @@ export function RegisterForm() {
       {error && (
         <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm">
           {error}
+        </div>
+      )}
+
+      {warning && (
+        <div className="bg-yellow-50 text-yellow-600 p-3 rounded-md text-sm">
+          {warning}
         </div>
       )}
 

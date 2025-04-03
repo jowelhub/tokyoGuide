@@ -287,3 +287,41 @@ VALUES
     139.4172,
     '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'
   );
+
+-- Create update_itinerary function for atomically updating itineraries
+CREATE OR REPLACE FUNCTION update_itinerary(_itinerary_id integer, _days_data jsonb)
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    day_data jsonb;
+    loc_id text;
+    new_day_id integer;
+    loc_index integer;
+BEGIN
+    -- Delete existing days and locations for this itinerary
+    DELETE FROM itinerary_locations WHERE day_id IN (SELECT id FROM itinerary_days WHERE itinerary_id = _itinerary_id);
+    DELETE FROM itinerary_days WHERE itinerary_id = _itinerary_id;
+
+    -- Insert new days and locations
+    FOR day_data IN SELECT * FROM jsonb_array_elements(_days_data)
+    LOOP
+        -- Insert the day
+        INSERT INTO itinerary_days (itinerary_id, day_number)
+        VALUES (_itinerary_id, (day_data->>'day_number')::integer)
+        RETURNING id INTO new_day_id;
+
+        -- Insert locations for this day
+        loc_index := 0;
+        FOR loc_id IN SELECT * FROM jsonb_array_elements_text(day_data->'locations')
+        LOOP
+            INSERT INTO itinerary_locations (day_id, location_id, position)
+            VALUES (new_day_id, loc_id, loc_index);
+            loc_index := loc_index + 1;
+        END LOOP;
+    END LOOP;
+
+    -- Update the itinerary's updated_at timestamp
+    UPDATE user_itineraries SET updated_at = NOW() WHERE id = _itinerary_id;
+END;
+$$;

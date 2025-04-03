@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { getOrCreateUserItinerary, updateUserItinerary, ItineraryDay } from '@/lib/supabase/itinerary';
 import type { LocationData } from '@/lib/types';
+import type { ItineraryDay } from '@/lib/supabase/itinerary';
 
 // Debounce delay for saving changes (1.5 seconds)
 const SAVE_DELAY_MS = 1500;
+
+// Key for storing itinerary in localStorage
+const ITINERARY_STORAGE_KEY = 'tokyo_guide_itinerary';
 
 export function useItinerary() {
   // State
@@ -19,35 +22,82 @@ export function useItinerary() {
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get auth state
-  const { user, isLoggedIn } = useAuth();
+  const { user, isLoggedIn, isLoading: isAuthLoading } = useAuth();
 
-  // Initialize itinerary when user logs in
-  useEffect(() => {
-    // Skip if already initialized or no user
-    if (isInitialized.current || !isLoggedIn || !user) {
+  // Fetch itinerary from API
+  const fetchItinerary = useCallback(async (showLoading = true) => {
+    if (!isLoggedIn) {
       return;
     }
     
-    console.log('[useItinerary] Initializing itinerary for user:', user.id);
-    setIsLoading(true);
+    console.log('[useItinerary] Fetching itinerary');
+    if (showLoading) {
+      setIsLoading(true);
+    }
     setError(null);
 
-    getOrCreateUserItinerary(user.id)
-      .then((itinerary) => {
-        console.log('[useItinerary] Successfully loaded itinerary:', itinerary.id);
-        setDays(itinerary.days);
-        setItineraryId(itinerary.id);
-        isInitialized.current = true;
-      })
-      .catch((err) => {
-        console.error('[useItinerary] Error loading itinerary:', err);
-        setError('Failed to load itinerary. Please refresh and try again.');
-        isInitialized.current = true; // Still mark as initialized to prevent loops
-      })
-      .finally(() => {
+    try {
+      const response = await fetch('/api/itinerary');
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to load itinerary');
+      }
+      
+      const itinerary = await response.json();
+      console.log('[useItinerary] Successfully loaded itinerary:', itinerary.id);
+      
+      // Update state and localStorage
+      setDays(itinerary.days);
+      setItineraryId(itinerary.id);
+      isInitialized.current = true;
+      
+      // Cache in localStorage
+      localStorage.setItem(ITINERARY_STORAGE_KEY, JSON.stringify({
+        id: itinerary.id,
+        days: itinerary.days
+      }));
+    } catch (err) {
+      console.error('[useItinerary] Error loading itinerary:', err);
+      setError('Failed to load itinerary. Please refresh and try again.');
+      isInitialized.current = true; // Still mark as initialized to prevent loops
+    } finally {
+      if (showLoading) {
         setIsLoading(false);
-      });
-  }, [isLoggedIn, user]);
+      }
+    }
+  }, [isLoggedIn]);
+
+  // Initialize itinerary when user logs in
+  useEffect(() => {
+    // Skip if still loading auth, or no user
+    if (isAuthLoading || !isLoggedIn) {
+      return;
+    }
+    
+    // Try to get itinerary from localStorage first
+    try {
+      const storedItinerary = localStorage.getItem(ITINERARY_STORAGE_KEY);
+      
+      if (storedItinerary) {
+        const parsedItinerary = JSON.parse(storedItinerary);
+        setDays(parsedItinerary.days);
+        setItineraryId(parsedItinerary.id);
+        isInitialized.current = true;
+        setIsLoading(false);
+        
+        // Still fetch from API in the background to ensure data is fresh
+        fetchItinerary(false);
+      } else {
+        // If no cached data, fetch from API with loading indicator
+        fetchItinerary(true);
+      }
+    } catch (error) {
+      console.error('[useItinerary] Error initializing from localStorage:', error);
+      // If localStorage fails, fall back to API
+      fetchItinerary(true);
+    }
+  }, [isLoggedIn, isAuthLoading, fetchItinerary]);
 
   // Add a new day
   const addDay = useCallback(() => {
@@ -125,26 +175,38 @@ export function useItinerary() {
     console.log('[useItinerary] Planning to save changes after debounce');
     
     // Set a new timer for saving
-    saveTimerRef.current = setTimeout(() => {
+    saveTimerRef.current = setTimeout(async () => {
       console.log('[useItinerary] Debounce complete, saving changes');
       setIsSaving(true);
+      setError(null);
       
-      updateUserItinerary(itineraryId, days)
-        .then((success) => {
-          if (success) {
-            console.log('[useItinerary] Successfully saved itinerary changes');
-          } else {
-            console.error('[useItinerary] Failed to save itinerary changes');
-            setError('Failed to save itinerary. Changes may not be saved.');
-          }
-        })
-        .catch((err) => {
-          console.error('[useItinerary] Error saving itinerary:', err);
-          setError('An error occurred while saving your itinerary.');
-        })
-        .finally(() => {
-          setIsSaving(false);
+      try {
+        const response = await fetch('/api/itinerary', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ itineraryId, days })
         });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to save itinerary');
+        }
+        
+        console.log('[useItinerary] Successfully saved itinerary changes');
+        
+        // Update localStorage with latest data
+        localStorage.setItem(ITINERARY_STORAGE_KEY, JSON.stringify({
+          id: itineraryId,
+          days: days
+        }));
+      } catch (err) {
+        console.error('[useItinerary] Error saving itinerary:', err);
+        setError('An error occurred while saving your itinerary.');
+      } finally {
+        setIsSaving(false);
+      }
     }, SAVE_DELAY_MS);
 
     // Cleanup function to clear the timer if component unmounts
@@ -164,5 +226,6 @@ export function useItinerary() {
     removeDay,
     addLocationToDay,
     removeLocationFromDay,
+    fetchItinerary
   };
 }
