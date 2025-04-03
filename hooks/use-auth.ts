@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { createBrowserClient } from "@supabase/ssr"
-import type { User, Session } from "@supabase/supabase-js"
+import type { User, Session, AuthChangeEvent } from "@supabase/supabase-js"
 
 // Initialize Supabase client only once using useRef to avoid re-creation on re-renders
 const getSupabaseBrowserClient = () => {
@@ -61,9 +61,10 @@ export function useAuth() {
 
     // --- Listener for Auth Changes ---
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      // Add the types here:
+      (_event: AuthChangeEvent, session: Session | null) => {
         if (!isMounted) return; // Prevent state update if component unmounted
-
+    
         console.log(`[useAuth] onAuthStateChange event: ${_event}`, session ? 'Session exists' : 'No session');
         setUser(session?.user ?? null);
         // We might briefly set loading to true during transitions like SIGNED_IN/SIGNED_OUT

@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import type { LocationData } from '@/lib/types';
-import type { ItineraryDay } from '@/lib/supabase/itinerary';
+import type { LocationData, ItineraryDay } from '@/lib/types';
 
 // Debounce delay for saving changes (1.5 seconds)
 const SAVE_DELAY_MS = 1500;

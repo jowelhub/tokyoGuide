@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import type { ItineraryDay } from "@/lib/supabase/itinerary";
+import type { ItineraryDay } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 

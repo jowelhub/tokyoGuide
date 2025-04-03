@@ -7,6 +7,11 @@ export interface LocationData {
   images: string[]
 }
 
+export interface ItineraryDay {
+  id: number; // Represents the day number (1, 2, 3...)
+  locations: LocationData[];
+}
+
 export interface CategoryFilterProps {
   categories: string[]
   onFilterChange: (selectedCategories: string[]) => void
@@ -26,3 +31,4 @@ export interface MapViewProps {
   onViewportChange: (locationsInViewport: LocationData[]) => void
   refreshFavorites?: () => Promise<void>
 }
+

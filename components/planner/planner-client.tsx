@@ -61,7 +61,6 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
   
   const { 
     days, 
-    setDays, 
     addDay, 
     removeDay, 
     addLocationToDay, 
