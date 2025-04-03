@@ -1,147 +1,121 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
-import type { User } from "@supabase/supabase-js"
+import { createBrowserClient } from "@supabase/ssr"
+import type { User, Session } from "@supabase/supabase-js"
 
-// Keys for storing auth data in localStorage
-const USER_STORAGE_KEY = 'tokyo_guide_user'
-const EXPIRES_AT_STORAGE_KEY = 'tokyo_guide_expires_at'
+// Initialize Supabase client only once using useRef to avoid re-creation on re-renders
+const getSupabaseBrowserClient = () => {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true) // Start loading until initial check is done
+  const [isInitialized, setIsInitialized] = useState(false); // Track if the initial check is complete
   const router = useRouter()
+  const supabaseRef = useRef<ReturnType<typeof createBrowserClient> | null>(null);
 
-  // Initialize user from localStorage on mount
+  if (!supabaseRef.current) {
+    supabaseRef.current = getSupabaseBrowserClient();
+  }
+  const supabase = supabaseRef.current;
+
+
   useEffect(() => {
-    const initializeUser = () => {
+    console.log('[useAuth] useEffect running - checking initial session');
+    let isMounted = true;
+
+    async function getInitialSession() {
       try {
-        setIsLoading(true);
-        // Try to get user and expiration from localStorage first
-        const storedUser = localStorage.getItem(USER_STORAGE_KEY);
-        const storedExpiresAt = localStorage.getItem(EXPIRES_AT_STORAGE_KEY);
-        
-        if (storedUser && storedExpiresAt) {
-          const parsedUser = JSON.parse(storedUser);
-          const expiresAt = new Date(storedExpiresAt);
-          const now = new Date();
-          
-          // Check if token is still valid
-          if (expiresAt > now) {
-            setUser(parsedUser);
-            // If token expires soon (within 10 minutes), refresh in background
-            const tenMinutesFromNow = new Date(now.getTime() + 10 * 60 * 1000);
-            if (expiresAt < tenMinutesFromNow) {
-              fetchUser(false); // Silent refresh
-            }
-          } else {
-            // Token expired, fetch new one
-            console.log('Token expired, fetching new session');
-            fetchUser(true);
-          }
+        // getSession reads from storage/cookies, doesn't necessarily hit the network
+        const { data: { session }, error } = await supabase.auth.getSession();
+
+        if (!isMounted) return; // Prevent state update if component unmounted
+
+        if (error) {
+          console.error("[useAuth] Error getting initial session:", error.message);
+          setUser(null);
         } else {
-          // Only make API call if no valid user data in localStorage
-          fetchUser(true);
+          console.log('[useAuth] Initial session fetched:', session ? 'Exists' : 'None');
+          setUser(session?.user ?? null);
         }
-      } catch (error) {
-        console.error("Error initializing user:", error);
-        // If localStorage fails, fall back to API
-        fetchUser(true);
+      } catch (err) {
+        if (isMounted) {
+           console.error("[useAuth] Unexpected error fetching initial session:", err);
+           setUser(null);
+        }
       } finally {
-        setIsLoading(false);
-      }
-    }
-
-    initializeUser();
-  }, []);
-
-  // Function to fetch user from API
-  const fetchUser = useCallback(async (showLoading = true) => {
-    try {
-      if (showLoading) {
-        setIsLoading(true);
-      }
-      
-      const response = await fetch('/api/session');
-      const data = await response.json();
-      
-      if (data.user) {
-        // Store user and expiration in localStorage to avoid future API calls
-        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
-        
-        if (data.expiresAt) {
-          localStorage.setItem(EXPIRES_AT_STORAGE_KEY, data.expiresAt);
+        if (isMounted) {
+          setIsLoading(false);
+          setIsInitialized(true);
+          console.log('[useAuth] Initial check complete. Loading:', false);
         }
-        
-        setUser(data.user);
-      } else {
-        // Clear stored auth data
-        localStorage.removeItem(USER_STORAGE_KEY);
-        localStorage.removeItem(EXPIRES_AT_STORAGE_KEY);
-        setUser(null);
-      }
-      
-      return data.user;
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      localStorage.removeItem(USER_STORAGE_KEY);
-      localStorage.removeItem(EXPIRES_AT_STORAGE_KEY);
-      setUser(null);
-      return null;
-    } finally {
-      if (showLoading) {
-        setIsLoading(false);
       }
     }
-  }, []);
 
-  // Function to update user state (called by login/register forms)
-  const updateUserState = useCallback((newUser: User | null) => {
-    if (newUser) {
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(newUser))
-    } else {
-      localStorage.removeItem(USER_STORAGE_KEY)
-    }
-    setUser(newUser)
-  }, [])
+    getInitialSession();
+
+    // --- Listener for Auth Changes ---
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (!isMounted) return; // Prevent state update if component unmounted
+
+        console.log(`[useAuth] onAuthStateChange event: ${_event}`, session ? 'Session exists' : 'No session');
+        setUser(session?.user ?? null);
+        // We might briefly set loading to true during transitions like SIGNED_IN/SIGNED_OUT
+        // but the main loading state is for the *initial* check.
+        // For subsequent changes, the UI should ideally react to the user state change directly.
+        if (_event === 'INITIAL_SESSION' || _event === 'SIGNED_IN' || _event === 'SIGNED_OUT' || _event === 'USER_UPDATED') {
+          setIsLoading(false); // Ensure loading is false after definite events
+        }
+      }
+    );
+
+    // --- Cleanup ---
+    return () => {
+      isMounted = false;
+      console.log('[useAuth] Cleaning up auth listener.');
+      if (authListener?.subscription) {
+        authListener.subscription.unsubscribe();
+      }
+    };
+  }, [supabase]); // Depend only on the supabase client instance
 
   const signOut = useCallback(async () => {
+    console.log('[useAuth] Signing out...');
+    setIsLoading(true); // Indicate loading during sign out process
     try {
-      setIsLoading(true);
-      const response = await fetch('/api/logout', { 
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to sign out');
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error("Error signing out:", error.message);
+        throw error;
       }
-      
-      // Clear all auth data from localStorage
-      localStorage.removeItem(USER_STORAGE_KEY);
-      localStorage.removeItem(EXPIRES_AT_STORAGE_KEY);
-      setUser(null);
-      router.push('/');
-      router.refresh();
+      // setUser(null) will be handled by onAuthStateChange listener
+      console.log('[useAuth] Sign out successful via Supabase client.');
+      router.push('/'); // Redirect to home page after sign out
+      router.refresh(); // Refresh server components
       return { success: true };
     } catch (error) {
-      console.error("Error signing out:", error);
+      console.error("Error during sign out process:", error);
       return { success: false, error };
-    } finally {
-      setIsLoading(false);
     }
-  }, [router]);
+  }, [supabase, router]);
 
   return {
     user,
-    isLoggedIn: !!user,
-    isLoading,
-    refreshUser: fetchUser, // Renamed from checkUser to better reflect its purpose
-    updateUserState,
-    signOut
+    // Check if initialization is complete AND user exists
+    isLoggedIn: isInitialized && !!user,
+    // Only true during the very first session check on mount
+    isLoading: isLoading,
+    // Can be used to wait for the initial check if needed elsewhere
+    isInitialized,
+    signOut,
+    // Expose Supabase client for direct use if needed (e.g., for OAuth in forms)
+    supabase 
   }
 }

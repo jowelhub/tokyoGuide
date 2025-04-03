@@ -15,7 +15,7 @@ export function RegisterForm() {
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const router = useRouter();
-  const { refreshUser } = useAuth();
+  const { isLoggedIn } = useAuth();
   
   const handleGoogleSignIn = async () => {
     setLoading(true);
@@ -75,8 +75,6 @@ export function RegisterForm() {
         setWarning(data.warning);
       }
       
-      // Refresh the user state
-      await refreshUser();
       router.push("/explore");
       router.refresh();
     } catch (err) {

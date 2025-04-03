@@ -15,7 +15,7 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { refreshUser } = useAuth();
+  const { isLoggedIn } = useAuth();
   const isRegistered = searchParams.get("registered") === "true";
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -39,8 +39,6 @@ export function LoginForm() {
         return;
       }
       
-      // Refresh the user state
-      await refreshUser();
       router.push("/explore");
       router.refresh();
     } catch (err) {
