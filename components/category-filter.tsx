@@ -19,8 +19,8 @@ export default function CategoryFilter({
   onFavoritesFilterChange,
   refreshFavorites
 }: CategoryFilterProps) {
-  const { isLoggedIn } = useAuth();
-  const { refreshFavorites: refreshUserFavorites } = useFavorites();
+  const { isLoggedIn, isInitialized } = useAuth();
+  const { refreshFavorites: refreshUserFavorites, isFetching } = useFavorites();
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
@@ -58,9 +58,13 @@ export default function CategoryFilter({
     const newShowOnlyFavorites = !showOnlyFavorites;
     setShowOnlyFavorites(newShowOnlyFavorites);
     
-    // First refresh favorites to ensure we have the latest data
-    if (refreshFavorites && newShowOnlyFavorites) {
-      await refreshFavorites();
+    // Refresh favorites if needed and auth is ready
+    if (isInitialized && newShowOnlyFavorites && !isFetching) {
+      if (refreshFavorites) {
+        await refreshFavorites();
+      } else if (refreshUserFavorites) {
+        await refreshUserFavorites(false); // Don't show loading indicator
+      }
     }
     
     // Then update the filter

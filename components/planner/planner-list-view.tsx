@@ -26,6 +26,7 @@ export default function PlannerListView({
 }: PlannerListViewProps) {
   const { isLoggedIn } = useAuth();
   const { toggleFavorite, isLoading } = useFavorites();
+  // Use the passed userFavorites prop instead of fetching again in this component
   
   const handleToggleFavorite = async (locationId: string) => {
     if (!isLoggedIn) {
