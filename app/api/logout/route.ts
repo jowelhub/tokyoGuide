@@ -9,16 +9,16 @@ export async function POST() {
     const { error } = await supabase.auth.signOut();
 
     if (error) {
-      console.error("Logout error:", error.message);
+      console.error("Server logout error:", error.message);
       return NextResponse.json(
-        { error: error.message },
+        { error: "Failed to sign out" },
         { status: 500 }
       );
     }
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
-    console.error("Unexpected logout error:", error);
+    console.error("Unexpected error during logout:", error);
     return NextResponse.json(
       { error: "An unexpected error occurred" },
       { status: 500 }

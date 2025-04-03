@@ -25,7 +25,6 @@ export function useAuth() {
   }
   const supabase = supabaseRef.current;
 
-
   useEffect(() => {
     console.log('[useAuth] useEffect running - checking initial session');
     let isMounted = true;
@@ -87,24 +86,30 @@ export function useAuth() {
   }, [supabase]); // Depend only on the supabase client instance
 
   const signOut = useCallback(async () => {
-    console.log('[useAuth] Signing out...');
+    console.log('[useAuth] Signing out via API...');
     setIsLoading(true); // Indicate loading during sign out process
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error("Error signing out:", error.message);
-        throw error;
+      // Call the API route instead of direct Supabase client call
+      const response = await fetch('/api/logout', { method: 'POST' });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Error signing out via API:", errorData.error || 'Unknown error');
+        throw new Error(errorData.error || 'Failed to sign out');
       }
-      // setUser(null) will be handled by onAuthStateChange listener
-      console.log('[useAuth] Sign out successful via Supabase client.');
+
+      // setUser(null) will be handled by onAuthStateChange listener triggered by cookie removal
+      console.log('[useAuth] Sign out successful via API call.');
       router.push('/'); // Redirect to home page after sign out
       router.refresh(); // Refresh server components
       return { success: true };
     } catch (error) {
       console.error("Error during sign out process:", error);
+      setIsLoading(false); // Ensure loading is false on error
       return { success: false, error };
     }
-  }, [supabase, router]);
+    // No finally needed here for setIsLoading, as it's handled by onAuthStateChange
+  }, [router]); // Remove supabase dependency as it's no longer used directly here
 
   return {
     user,
