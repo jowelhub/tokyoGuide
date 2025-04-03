@@ -161,8 +161,24 @@ export function useItinerary() {
 
   // Save changes with debouncing
   useEffect(() => {
+    // Log the effect run and current state for diagnosis
+    console.log('[useItinerary Save Effect] Running. Conditions:', { 
+      isInitialized: isInitialized.current, 
+      isLoading, 
+      isSaving, 
+      isLoggedIn, 
+      hasItineraryId: !!itineraryId 
+    });
+
     // Don't save if not initialized, still loading, already saving, or no user
     if (!isInitialized.current || isLoading || isSaving || !isLoggedIn || !itineraryId) {
+      console.log('[useItinerary Save Effect] Skipping save due to conditions not met.', {
+        notInitialized: !isInitialized.current,
+        isLoading,
+        isSaving,
+        notLoggedIn: !isLoggedIn,
+        noItineraryId: !itineraryId
+      });
       return;
     }
 
@@ -214,7 +230,7 @@ export function useItinerary() {
         clearTimeout(saveTimerRef.current);
       }
     };
-  }, [days, itineraryId, isSaving, isLoading, isLoggedIn]);
+  }, [days, itineraryId, isLoggedIn]); // Removed isSaving and isLoading from dependencies
 
   return {
     days,
