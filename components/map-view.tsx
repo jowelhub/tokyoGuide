@@ -1,10 +1,11 @@
 "use client"
 
 import React, { useState, useEffect, useRef } from "react"
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, ZoomControl } from "react-leaflet"
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
 import L from "leaflet"
 import { MAP_CONFIG, MARKER_CONFIG } from "@/lib/constants"
+import { Button } from "@/components/ui/button"
 import { useMap } from "react-leaflet"
 import { createMarkerSvg } from "@/lib/marker-icon"
 import type { LocationData, MapViewProps } from "@/lib/types"
@@ -103,6 +104,47 @@ const customPopupStyles = `
     color: #717171;
   }
 `;
+
+// Component for custom zoom controls
+function CustomZoomControl() {
+  const map = useMap();
+
+  const handleZoomIn = () => {
+    map.zoomIn();
+  };
+
+  const handleZoomOut = () => {
+    map.zoomOut();
+  };
+
+  return (
+    // Group buttons visually, add rounded corners, adjust spacing from bottom
+    <div className="absolute bottom-6 right-4 z-[1000] flex flex-col overflow-hidden rounded-md border bg-white shadow">
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={handleZoomIn}
+        // Make button smaller, remove individual shadow/border, adjust rounding
+        className="hover:bg-gray-100 h-9 w-9 rounded-none border-b border-border"
+        aria-label="Zoom in"
+      >
+        {/* Increase strokeWidth for bolder icon */}
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+      </Button>
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={handleZoomOut}
+        // Make button smaller, remove individual shadow/border, adjust rounding
+        className="hover:bg-gray-100 h-9 w-9 rounded-none"
+        aria-label="Zoom out"
+      >
+        {/* Increase strokeWidth for bolder icon */}
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14" /></svg>
+      </Button>
+    </div>
+  );
+}
 
 // Component to handle viewport changes and update visible locations
 function ViewportHandler({
@@ -289,9 +331,8 @@ export default function MapView({
 				zoom={MAP_CONFIG.defaultZoom}
 				scrollWheelZoom={true}
 				style={{ height: "100%", width: "100%" }}
-				zoomControl={false}
+				zoomControl={false} // Disable the default zoom control
 			>
-				<ZoomControl position="topright" />
 				<TileLayer
 					attribution={MAP_CONFIG.attribution}
 					url={MAP_CONFIG.tileLayerUrl}
@@ -338,7 +379,8 @@ export default function MapView({
 
 				})}
 				<ViewportHandler locations={locations} onViewportChange={onViewportChange} />
-				<MapBoundsController locationsToFit={locationsToFit} onBoundsFitted={onBoundsFitted} /> {/* Add this */}
+				<MapBoundsController locationsToFit={locationsToFit} onBoundsFitted={onBoundsFitted} />
+				<CustomZoomControl /> {/* Add the custom zoom control */}
 			</MapContainer>
 		</div>
 	)
