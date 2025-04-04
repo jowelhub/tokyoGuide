@@ -19,6 +19,7 @@ import { useFavorites } from "@/hooks/use-favorites"
 import { useItinerary } from "@/hooks/use-itinerary"
 import Image from "next/image"
 import SearchInput from "@/components/search-input"
+import { cn } from "@/lib/utils"
 
 // Dynamically import MapView to avoid SSR issues with Leaflet
 const MapView = dynamic(() => import("@/components/map-view"), {
@@ -59,8 +60,8 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 	const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
 	const [selectedCategories, setSelectedCategories] = useState<string[]>([])
 	const [selectedDayIds, setSelectedDayIds] = useState<number[]>([])
-	const [searchQuery, setSearchQuery] = useState(''); // <-- New state for search
-	const [locationsToFit, setLocationsToFit] = useState<LocationData[] | null>(null) // State to trigger map bounds adjustment
+	const [searchQuery, setSearchQuery] = useState('');
+	const [locationsToFit, setLocationsToFit] = useState<LocationData[] | null>(null)
 
 	const {
 		days,
@@ -88,13 +89,10 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 		return map;
 	}, [days]);
 
-	// Function to refresh favorites - will be passed to child components
+	// Function to refresh favorites
 	const refreshFavorites = async () => {
 		await fetchFavorites();
-
-		// If we're showing only favorites, we need to update the filtered locations immediately
 		if (showOnlyFavorites) {
-			// Apply both favorites and category filters
 			const newFilteredLocations = initialLocations.filter(location =>
 				userFavorites.includes(location.id) &&
 				(selectedCategories.length === 0 || selectedCategories.includes(location.category))
@@ -103,33 +101,25 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 		}
 	};
 
-	// Apply filters whenever selectedCategories, showOnlyFavorites, selectedDayIds, or searchQuery changes
+	// Apply filters
 	useEffect(() => {
 		let newFilteredLocations = initialLocations;
-
-		// Apply category filter if any categories are selected
 		if (selectedCategories.length > 0) {
 			newFilteredLocations = newFilteredLocations.filter(location =>
 				selectedCategories.includes(location.category)
 			);
 		}
-
-		// Apply favorites filter if showOnlyFavorites is true
 		if (showOnlyFavorites) {
 			newFilteredLocations = newFilteredLocations.filter(location =>
 				userFavorites.includes(location.id)
 			);
 		}
-
-		// Apply day filter if any days are selected
 		if (selectedDayIds.length > 0) {
 			const allowedLocationIds = getLocationsFromSelectedDays(days, selectedDayIds);
 			newFilteredLocations = newFilteredLocations.filter(location =>
 				allowedLocationIds.has(location.id)
 			);
 		}
-
-		// Apply search filter if searchQuery is not empty
 		if (searchQuery.trim() !== '') {
 			const lowerCaseQuery = searchQuery.toLowerCase();
 			newFilteredLocations = newFilteredLocations.filter(location =>
@@ -138,56 +128,37 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 				location.category.toLowerCase().includes(lowerCaseQuery)
 			);
 		}
-
 		setFilteredLocations(newFilteredLocations);
-		// Set locations for the map to fit, triggering the one-time adjustment
 		setLocationsToFit(newFilteredLocations.length > 0 ? newFilteredLocations : null);
-	}, [initialLocations, selectedCategories, showOnlyFavorites, userFavorites, selectedDayIds, days, searchQuery]); // <-- Added searchQuery dependency
+	}, [initialLocations, selectedCategories, showOnlyFavorites, userFavorites, selectedDayIds, days, searchQuery]);
 
 	const handleFilterChange = (selectedCategories: string[]) => {
 		setSelectedCategories(selectedCategories);
-		// No need to set locationsToFit here, the useEffect will handle it
 	}
-
 	const handleFavoritesFilterChange = (showFavorites: boolean) => {
 		setShowOnlyFavorites(showFavorites);
-		// No need to set locationsToFit here, the useEffect will handle it
 	}
-
 	const handleDayFilterChange = (newSelectedDayIds: number[]) => {
 		setSelectedDayIds(newSelectedDayIds);
-		// No need to set locationsToFit here, the useEffect will handle it
 	}
-
 	const handleSearchChange = (value: string) => {
 		setSearchQuery(value);
-		// No need to set locationsToFit here, the useEffect will handle it
 	}
-
 	const handleClearSearch = () => {
 		setSearchQuery('');
-		// No need to set locationsToFit here, the useEffect will handle it
 	}
-
 	const handleBoundsFitted = useCallback(() => {
 		setLocationsToFit(null);
 	}, []);
-
-
 	const handleLocationHover = (location: LocationData | null) => {
 		setHoveredLocation(location)
 	}
-
 	const handleViewportChange = (locationsInViewport: LocationData[]) => {
 		setVisibleLocations(locationsInViewport)
 	}
-
 	const toggleMobileView = (view: "map" | "list" | "plan") => {
 		setMobileView(view)
 	}
-
-	// Filter visible locations based on favorites if needed
-	// This remains unchanged, list view depends on this OR filteredLocations based on search
 	const getVisibleLocations = () => {
 		if (showOnlyFavorites && userFavorites.length > 0) {
 			return visibleLocations.filter(location =>
@@ -196,24 +167,19 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 		}
 		return visibleLocations;
 	}
-
-	// Day management functions
 	const selectDay = (dayId: number) => {
 		setSelectedDay(dayId);
 	}
-
-	// Location to day functions
 	const showAddToDay = (location: LocationData) => {
 		setLocationToAdd(location);
 		setShowDaySelector(true);
 	}
-
 	const hideAddToDay = () => {
 		setShowDaySelector(false);
 		setLocationToAdd(null);
 	}
 
-	// Function to render popup content for the Planner view (Unchanged)
+	// Function to render popup content for the Planner view
 	const renderPlannerPopupContent = ({
 		location,
 		isLoggedIn,
@@ -224,6 +190,7 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 		refreshFavorites,
 		onAddToDay
 	}: import("@/components/map-view").PopupContentProps) => {
+		// (Popup content remains the same as previous version)
 		return (
 			<div className="airbnb-popup-content">
 				<div className="relative w-full h-0 pb-[56.25%]">
@@ -238,74 +205,34 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 						onClick={async (e) => {
 							e.preventDefault();
 							e.stopPropagation();
-
-							if (!isLoggedIn) {
-								window.open('/login', '_blank');
-								return;
-							}
-
+							if (!isLoggedIn) { window.open('/login', '_blank'); return; }
 							if (isLoadingFavorite?.[location.id]) return;
-
 							const success = await toggleFavorite(location.id);
-							if (success && refreshFavorites) {
-								await refreshFavorites();
-							}
+							if (success && refreshFavorites) { await refreshFavorites(); }
 						}}
 						title={isLoggedIn ? (isFavorited(location.id) ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}
 					>
-						{isFavorited(location.id) ?
-							<HeartSolid className="w-5 h-5 text-red-500" /> :
-							<HeartOutline className="w-5 h-5 text-gray-700" />
-						}
+						{isFavorited(location.id) ? <HeartSolid className="w-5 h-5 text-red-500" /> : <HeartOutline className="w-5 h-5 text-gray-700" />}
 					</div>
 					<div
 						className="absolute right-2 top-2 bg-white rounded-full w-8 h-8 flex items-center justify-center z-10 cursor-pointer shadow-sm"
-						onClick={(e) => {
-							e.preventDefault();
-							e.stopPropagation();
-							onClosePopup();
-						}}
+						onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClosePopup(); }}
 						title="Close"
 					>
-						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-700">
-							<path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-						</svg>
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-700"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
 					</div>
 				</div>
-				<Link
-					href={`/location/${location.id}`}
-					target="_blank"
-					className="block"
-					onClick={(e) => {
-						if ((e.target as HTMLElement).closest('button')) {
-							e.stopPropagation();
-						}
-					}}
-				>
+				<Link href={`/location/${location.id}`} target="_blank" className="block" onClick={(e) => { if ((e.target as HTMLElement).closest('button')) { e.stopPropagation(); } }}>
 					<div className="p-4">
 						<h3 className="font-medium text-xl text-gray-900">{location.name}</h3>
 						<p className="text-sm text-gray-600 line-clamp-2 mt-1">{location.description}</p>
-						<div className="mt-2">
-							<span className="inline-block px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-800">
-								{location.category}
-							</span>
-						</div>
+						<div className="mt-2"><span className="inline-block px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-800">{location.category}</span></div>
 					</div>
 				</Link>
-
 				{onAddToDay && (
 					<div className="px-4 pb-4">
-						<button
-							onClick={(e) => {
-								e.preventDefault();
-								e.stopPropagation();
-								onClosePopup();
-								onAddToDay(location);
-							}}
-							className="w-full flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg transition-colors"
-						>
-							<PlusIcon className="w-5 h-5" />
-							<span>Add to itinerary</span>
+						<button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClosePopup(); onAddToDay(location); }} className="w-full flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg transition-colors">
+							<PlusIcon className="w-5 h-5" /><span>Add to itinerary</span>
 						</button>
 					</div>
 				)}
@@ -316,6 +243,9 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 	// Determine which locations to show in the list
 	const listLocations = searchQuery.trim() !== '' ? filteredLocations : getVisibleLocations();
 
+	// Calculate bottom padding needed for mobile views
+	const mobileBottomPadding = "pb-[60px]"; // Adjust this value based on the final height of the bottom nav
+
 	return (
 		<div className="h-full flex flex-col">
 			{/* Add to day selector */}
@@ -325,26 +255,13 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 						<h3 className="text-lg font-medium mb-4">Add to Day</h3>
 						<div className="space-y-2 max-h-60 overflow-y-auto">
 							{days.map((day) => (
-								<button
-									key={day.id}
-									onClick={() => {
-										addLocationToDay(day.id, locationToAdd);
-										hideAddToDay();
-									}}
-									className="w-full text-left p-2 hover:bg-gray-100 rounded flex justify-between items-center"
-								>
-									<span>Day {day.id}</span>
-									<span className="text-gray-500 text-sm">{day.locations.length} locations</span>
+								<button key={day.id} onClick={() => { addLocationToDay(day.id, locationToAdd); hideAddToDay(); }} className="w-full text-left p-2 hover:bg-gray-100 rounded flex justify-between items-center">
+									<span>Day {day.id}</span><span className="text-gray-500 text-sm">{day.locations.length} locations</span>
 								</button>
 							))}
 						</div>
 						<div className="mt-4 flex justify-end">
-							<button
-								onClick={hideAddToDay}
-								className="px-4 py-2 border rounded hover:bg-gray-100"
-							>
-								Cancel
-							</button>
+							<button onClick={hideAddToDay} className="px-4 py-2 border rounded hover:bg-gray-100">Cancel</button>
 						</div>
 					</div>
 				</div>
@@ -353,79 +270,26 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 			{/* Mobile: Toggle between map, list, and plan views */}
 			{isMobile ? (
 				<div className="h-full relative flex flex-col">
-					{/* Mobile navigation */}
-					<div className="bg-white border-b p-2 flex justify-center space-x-2">
-						<button
-							onClick={() => setMobileView("map")}
-							className={`flex-1 py-2 px-3 rounded-md flex items-center justify-center space-x-1 ${
-								mobileView === "map" ? "bg-blue-100 text-blue-700" : "text-gray-600"
-							}`}
-						>
-							<MapIcon className="w-5 h-5" />
-							<span>Map</span>
-						</button>
-						<button
-							onClick={() => setMobileView("list")}
-							className={`flex-1 py-2 px-3 rounded-md flex items-center justify-center space-x-1 ${
-								mobileView === "list" ? "bg-blue-100 text-blue-700" : "text-gray-600"
-							}`}
-						>
-							<ListBulletIcon className="w-5 h-5" />
-							<span>List</span>
-						</button>
-						<button
-							onClick={() => setMobileView("plan")}
-							className={`flex-1 py-2 px-3 rounded-md flex items-center justify-center space-x-1 ${
-								mobileView === "plan" ? "bg-blue-100 text-blue-700" : "text-gray-600"
-							}`}
-						>
-							<CalendarIcon className="w-5 h-5" />
-							<span>Plan</span>
-						</button>
-					</div>
-
 					{/* Mobile Search and Filters (Only for Map and List views) */}
 					{(mobileView === 'map' || mobileView === 'list') && (
 						<div className="p-2 bg-white border-b flex gap-2 items-center">
-							<SearchInput
-								value={searchQuery}
-								onChange={handleSearchChange}
-								onClear={handleClearSearch}
-								className="flex-grow"
-							/>
-							<CategoryFilter
-								categories={categories.map(cat => cat.name)}
-								onFilterChange={handleFilterChange}
-								onFavoritesFilterChange={handleFavoritesFilterChange}
-								refreshFavorites={refreshFavorites}
-							/>
-							<DayFilter
-								days={days}
-								selectedDayIds={selectedDayIds}
-								onDayFilterChange={handleDayFilterChange}
-							/>
+							<SearchInput value={searchQuery} onChange={handleSearchChange} onClear={handleClearSearch} className="flex-grow" />
+							<CategoryFilter categories={categories.map(cat => cat.name)} onFilterChange={handleFilterChange} onFavoritesFilterChange={handleFavoritesFilterChange} refreshFavorites={refreshFavorites} />
+							<DayFilter days={days} selectedDayIds={selectedDayIds} onDayFilterChange={handleDayFilterChange} />
 						</div>
 					)}
 
 					{/* Mobile content area */}
-					<div className="flex-1 overflow-hidden">
+					<div className="flex-1 overflow-hidden"> {/* Removed pb-16 here */}
 						{mobileView === "map" && (
-							<div className="relative h-full">
-								{/* Filters are now above */}
+							<div className={cn("relative h-full", mobileBottomPadding)}> {/* Added padding here */}
 								<MapView
 									locations={filteredLocations}
 									onLocationHover={handleLocationHover}
 									hoveredLocation={hoveredLocation}
 									onViewportChange={handleViewportChange}
 									refreshFavorites={refreshFavorites}
-									renderPopupContent={(props) => renderPlannerPopupContent({
-										...props,
-										isLoggedIn,
-										isFavorited,
-										toggleFavorite,
-										isLoadingFavorite,
-										onAddToDay: showAddToDay
-									})}
+									renderPopupContent={(props) => renderPlannerPopupContent({ ...props, isLoggedIn, isFavorited, toggleFavorite, isLoadingFavorite, onAddToDay: showAddToDay })}
 									locationToDayMap={locationToDayMap}
 									locationsToFit={locationsToFit}
 									onBoundsFitted={handleBoundsFitted}
@@ -433,45 +297,32 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 							</div>
 						)}
 						{mobileView === "list" && (
-							<ListView
-								locations={listLocations} // Use conditional list locations
-								onLocationHover={handleLocationHover}
-								hoveredLocation={hoveredLocation}
-								refreshFavorites={refreshFavorites}
-								userFavorites={userFavorites}
-								onAddToDay={showAddToDay}
-							/>
+							<div className={cn("h-full overflow-y-auto", mobileBottomPadding)}> {/* Added padding here */}
+								<ListView
+									locations={listLocations}
+									onLocationHover={handleLocationHover}
+									hoveredLocation={hoveredLocation}
+									refreshFavorites={refreshFavorites}
+									userFavorites={userFavorites}
+									onAddToDay={showAddToDay}
+								/>
+							</div>
 						)}
 						{mobileView === "plan" && (
-							<div className="h-full flex flex-col">
-								<div className="p-3 bg-white border-b flex justify-between items-center">
+							<div className={cn("h-full flex flex-col", mobileBottomPadding)}> {/* Added padding here */}
+								<div className="p-3 bg-white border-b flex justify-between items-center sticky top-0 z-10"> {/* Made header sticky */}
 									<h2 className="text-lg font-medium">Your Plan</h2>
 									<div className="flex space-x-2">
-										<button
-											onClick={addDay}
-											className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
-										>
-											Add Day
-										</button>
+										<button onClick={addDay} className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600">Add Day</button>
 									</div>
 								</div>
 								<div className="flex-1 overflow-y-auto p-4">
 									{days.length === 0 ? (
-										<EmptyState
-											message="No days planned yet"
-											description="Add a day to start planning your trip"
-										/>
+										<EmptyState message="No days planned yet" description="Add a day to start planning your trip" />
 									) : (
 										<div className="space-y-6">
 											{days.map((day) => (
-												<DayItinerary
-													key={day.id}
-													day={day}
-													isSelected={day.id === selectedDay}
-													onSelect={() => selectDay(day.id)}
-													onRemove={() => removeDay(day.id)}
-													onRemoveLocation={(locationId) => removeLocationFromDay(day.id, locationId)}
-												/>
+												<DayItinerary key={day.id} day={day} isSelected={day.id === selectedDay} onSelect={() => selectDay(day.id)} onRemove={() => removeDay(day.id)} onRemoveLocation={(locationId) => removeLocationFromDay(day.id, locationId)} />
 											))}
 										</div>
 									)}
@@ -479,40 +330,59 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 							</div>
 						)}
 					</div>
+
+					{/* Mobile bottom navigation - Adjusted layout */}
+					<div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t p-1 flex justify-around items-center h-[60px]"> {/* Set fixed height */}
+						<button
+							onClick={() => setMobileView("map")}
+							className={cn(
+								"flex-1 py-1 px-2 rounded-md flex items-center justify-center gap-1.5 text-xs h-full", // Use h-full
+								mobileView === "map" ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-50"
+							)}
+						>
+							<MapIcon className="w-5 h-5" />
+							<span>Map</span>
+						</button>
+						<button
+							onClick={() => setMobileView("list")}
+							className={cn(
+								"flex-1 py-1 px-2 rounded-md flex items-center justify-center gap-1.5 text-xs h-full", // Use h-full
+								mobileView === "list" ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-50"
+							)}
+						>
+							<ListBulletIcon className="w-5 h-5" />
+							<span>List</span>
+						</button>
+						<button
+							onClick={() => setMobileView("plan")}
+							className={cn(
+								"flex-1 py-1 px-2 rounded-md flex items-center justify-center gap-1.5 text-xs h-full", // Use h-full
+								mobileView === "plan" ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-50"
+							)}
+						>
+							<CalendarIcon className="w-5 h-5" />
+							<span>Plan</span>
+						</button>
+					</div>
 				</div>
 			) : (
-				// Desktop: Three-column layout (plan, list, map)
+				// Desktop: Three-column layout (plan, list, map) - Remains unchanged
 				<div className="h-full flex">
 					{/* Left column: Plan view */}
 					<div className="w-[30%] h-full flex flex-col border-r">
 						<div className="p-3 bg-white border-b flex justify-between items-center">
 							<h2 className="text-lg font-medium">Your Plan</h2>
 							<div className="flex space-x-2">
-								<button
-									onClick={addDay}
-									className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-								>
-									Add Day
-								</button>
+								<button onClick={addDay} className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">Add Day</button>
 							</div>
 						</div>
 						<div className="flex-1 overflow-y-auto p-4">
 							{days.length === 0 ? (
-								<EmptyState
-									message="No days planned yet"
-									description="Add a day to start planning your trip"
-								/>
+								<EmptyState message="No days planned yet" description="Add a day to start planning your trip" />
 							) : (
 								<div className="space-y-6">
 									{days.map((day) => (
-										<DayItinerary
-											key={day.id}
-											day={day}
-											isSelected={day.id === selectedDay}
-											onSelect={() => selectDay(day.id)}
-											onRemove={() => removeDay(day.id)}
-											onRemoveLocation={(locationId) => removeLocationFromDay(day.id, locationId)}
-										/>
+										<DayItinerary key={day.id} day={day} isSelected={day.id === selectedDay} onSelect={() => selectDay(day.id)} onRemove={() => removeDay(day.id)} onRemoveLocation={(locationId) => removeLocationFromDay(day.id, locationId)} />
 									))}
 								</div>
 							)}
@@ -522,14 +392,7 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 					{/* Middle column: List view */}
 					<div className="w-[30%] h-full flex flex-col border-r">
 						<div className="flex-1 overflow-y-auto">
-							<ListView
-								locations={listLocations} // Use conditional list locations
-								onLocationHover={handleLocationHover}
-								hoveredLocation={hoveredLocation}
-								refreshFavorites={refreshFavorites}
-								userFavorites={userFavorites}
-								onAddToDay={showAddToDay}
-							/>
+							<ListView locations={listLocations} onLocationHover={handleLocationHover} hoveredLocation={hoveredLocation} refreshFavorites={refreshFavorites} userFavorites={userFavorites} onAddToDay={showAddToDay} />
 						</div>
 					</div>
 
@@ -537,42 +400,11 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 					<div className="w-[40%] h-full relative">
 						{/* Filters Overlay */}
 						<div className="absolute top-2 left-2 z-10 flex gap-2 items-center bg-white/80 backdrop-blur-sm p-1 rounded-lg shadow">
-							<SearchInput
-								value={searchQuery}
-								onChange={handleSearchChange}
-								onClear={handleClearSearch}
-								className="w-48" // Adjust width as needed
-							/>
-							<CategoryFilter
-								categories={categories.map(cat => cat.name)}
-								onFilterChange={handleFilterChange}
-								onFavoritesFilterChange={handleFavoritesFilterChange}
-								refreshFavorites={refreshFavorites}
-							/>
-							<DayFilter
-								days={days}
-								selectedDayIds={selectedDayIds}
-								onDayFilterChange={handleDayFilterChange}
-							/>
+							<SearchInput value={searchQuery} onChange={handleSearchChange} onClear={handleClearSearch} className="w-48" />
+							<CategoryFilter categories={categories.map(cat => cat.name)} onFilterChange={handleFilterChange} onFavoritesFilterChange={handleFavoritesFilterChange} refreshFavorites={refreshFavorites} />
+							<DayFilter days={days} selectedDayIds={selectedDayIds} onDayFilterChange={handleDayFilterChange} />
 						</div>
-						<MapView
-							locations={filteredLocations}
-							onLocationHover={handleLocationHover}
-							hoveredLocation={hoveredLocation}
-							onViewportChange={handleViewportChange}
-							refreshFavorites={refreshFavorites}
-							renderPopupContent={(props) => renderPlannerPopupContent({
-								...props,
-								isLoggedIn,
-								isFavorited,
-								toggleFavorite,
-								isLoadingFavorite,
-								onAddToDay: showAddToDay
-							})}
-							locationToDayMap={locationToDayMap}
-							locationsToFit={locationsToFit}
-							onBoundsFitted={handleBoundsFitted}
-						/>
+						<MapView locations={filteredLocations} onLocationHover={handleLocationHover} hoveredLocation={hoveredLocation} onViewportChange={handleViewportChange} refreshFavorites={refreshFavorites} renderPopupContent={(props) => renderPlannerPopupContent({ ...props, isLoggedIn, isFavorited, toggleFavorite, isLoadingFavorite, onAddToDay: showAddToDay })} locationToDayMap={locationToDayMap} locationsToFit={locationsToFit} onBoundsFitted={handleBoundsFitted} />
 					</div>
 				</div>
 			)}
