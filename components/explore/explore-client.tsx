@@ -16,6 +16,7 @@ import { HeartIcon as HeartSolid } from "@heroicons/react/24/solid"
 import { HeartIcon as HeartOutline } from "@heroicons/react/24/outline"
 import Link from "next/link"
 import Image from "next/image"
+import SearchInput from "@/components/search-input"
 
 // Dynamically import MapView to avoid SSR issues with Leaflet
 const MapView = dynamic(() => import("../map-view"), {
@@ -38,6 +39,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 	const [mobileView, setMobileView] = useState<"map" | "list">("map") // Default to map view on mobile
 	const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
 	const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+	const [searchQuery, setSearchQuery] = useState(''); // <-- New state for search
 	const [locationsToFit, setLocationsToFit] = useState<LocationData[] | null>(null) // State to trigger map bounds adjustment
 
 	// Function to refresh favorites - will be passed to child components
@@ -55,7 +57,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 		}
 	};
 
-	// Apply filters whenever selectedCategories or showOnlyFavorites changes
+	// Apply filters whenever selectedCategories, showOnlyFavorites, or searchQuery changes
 	useEffect(() => {
 		let newFilteredLocations = initialLocations;
 
@@ -73,52 +75,39 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 			);
 		}
 
+		// Apply search filter if searchQuery is not empty
+		if (searchQuery.trim() !== '') {
+			const lowerCaseQuery = searchQuery.toLowerCase();
+			newFilteredLocations = newFilteredLocations.filter(location =>
+				location.name.toLowerCase().includes(lowerCaseQuery) ||
+				location.description.toLowerCase().includes(lowerCaseQuery) ||
+				location.category.toLowerCase().includes(lowerCaseQuery)
+			);
+		}
+
 		setFilteredLocations(newFilteredLocations)
 		// Set locations for the map to fit, triggering the one-time adjustment
 		setLocationsToFit(newFilteredLocations.length > 0 ? newFilteredLocations : null)
-	}, [initialLocations, selectedCategories, showOnlyFavorites, userFavorites])
+	}, [initialLocations, selectedCategories, showOnlyFavorites, userFavorites, searchQuery]) // <-- Added searchQuery dependency
 
 	const handleFilterChange = (selectedCategories: string[]) => {
 		setSelectedCategories(selectedCategories);
-		let newFilteredLocations = initialLocations;
-
-		// Apply category filter
-		if (selectedCategories.length > 0) {
-			// Convert selected categories to lowercase for case-insensitive comparison
-			const lowerCaseSelectedCategories = selectedCategories.map(cat => cat.toLowerCase());
-
-			newFilteredLocations = newFilteredLocations.filter((location) =>
-				lowerCaseSelectedCategories.includes(location.category.toLowerCase())
-			);
-		}
-
-		// Apply favorites filter if enabled
-		if (showOnlyFavorites && userFavorites.length > 0) {
-			newFilteredLocations = newFilteredLocations.filter((location) =>
-				userFavorites.includes(location.id)
-			);
-		}
-
-		setFilteredLocations(newFilteredLocations)
-		// Trigger map adjustment
-		setLocationsToFit(newFilteredLocations.length > 0 ? newFilteredLocations : null)
+		// No need to set locationsToFit here, the useEffect will handle it
 	}
 
 	const handleFavoritesFilterChange = (showFavorites: boolean) => {
 		setShowOnlyFavorites(showFavorites);
+		// No need to set locationsToFit here, the useEffect will handle it
+	}
 
-		let newFilteredLocations = initialLocations;
+	const handleSearchChange = (value: string) => {
+		setSearchQuery(value);
+		// No need to set locationsToFit here, the useEffect will handle it
+	}
 
-		// Apply favorites filter
-		if (showFavorites && userFavorites.length > 0) {
-			newFilteredLocations = newFilteredLocations.filter((location) =>
-				userFavorites.includes(location.id)
-			);
-		}
-
-		setFilteredLocations(newFilteredLocations)
-		// Trigger map adjustment
-		setLocationsToFit(newFilteredLocations.length > 0 ? newFilteredLocations : null)
+	const handleClearSearch = () => {
+		setSearchQuery('');
+		// No need to set locationsToFit here, the useEffect will handle it
 	}
 
 	const handleLocationHover = (location: LocationData | null) => {
@@ -140,6 +129,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 	}
 
 	// Filter visible locations based on favorites if needed
+	// This remains unchanged, list view depends on this OR filteredLocations based on search
 	const getVisibleLocations = () => {
 		if (showOnlyFavorites && userFavorites.length > 0) {
 			return visibleLocations.filter(location =>
@@ -149,7 +139,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 		return visibleLocations;
 	}
 
-	// Function to render popup content for the Explore view
+	// Function to render popup content for the Explore view (Unchanged)
 	const renderExplorePopupContent = ({
 		location,
 		isLoggedIn,
@@ -190,21 +180,16 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 								e.stopPropagation();
 
 								if (!isLoggedIn) {
-									// Redirect to login if not logged in
 									window.open('/login', '_blank');
 									return;
 								}
 
 								if (isLoadingFavorite?.[location.id]) return;
 
-								// Toggle favorite status
 								const success = await toggleFavorite(location.id);
-								// Then refresh parent component state if needed
 								if (success && refreshFavorites) {
 									await refreshFavorites();
 								}
-
-								// Close popup if removing a favorite in favorites-only mode
 								if (success && !isFavorited(location.id) && document.querySelector('[data-favorites-filter="true"]')) {
 									onClosePopup();
 								}
@@ -231,23 +216,35 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 		);
 	};
 
+	// Determine which locations to show in the list
+	const listLocations = searchQuery.trim() !== '' ? filteredLocations : getVisibleLocations();
+
 	return (
 		<div className="flex-1 flex flex-col h-full">
 			{/* Mobile: Toggle between map and list views */}
 			{isMobile ? (
 				<div className="h-full relative flex flex-col">
+					{/* Mobile Search and Filters */}
+					<div className="p-2 bg-white border-b flex gap-2 items-center">
+						<SearchInput
+							value={searchQuery}
+							onChange={handleSearchChange}
+							onClear={handleClearSearch}
+							className="flex-grow"
+						/>
+						<CategoryFilter
+							categories={categories.map(cat => cat.name)}
+							onFilterChange={handleFilterChange}
+							onFavoritesFilterChange={handleFavoritesFilterChange}
+							refreshFavorites={refreshFavorites}
+						/>
+					</div>
+
 					{/* Map View */}
 					{mobileView === "map" && (
 						<>
 							<div className="flex-1 relative">
-								<div className="absolute top-2 left-2 z-10">
-									<CategoryFilter
-										categories={categories.map(cat => cat.name)}
-										onFilterChange={handleFilterChange}
-										onFavoritesFilterChange={handleFavoritesFilterChange}
-										refreshFavorites={refreshFavorites}
-									/>
-								</div>
+								{/* Filters are now above */}
 								<MapView
 									locations={filteredLocations} // Pass all filtered locations for map markers
 									onLocationHover={handleLocationHover}
@@ -273,7 +270,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 									className="flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-md border"
 								>
 									<ListBulletIcon className="h-5 w-5" />
-									<span>Show list ({getVisibleLocations().length} places)</span>
+									<span>Show list ({listLocations.length} places)</span>
 								</button>
 							</div>
 						</>
@@ -295,16 +292,16 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 								</div>
 
 								<div className="flex-1 overflow-y-auto">
-									{getVisibleLocations().length > 0 ? (
-										<ListView // List view still renders based on visible locations
-											locations={getVisibleLocations()}
+									{listLocations.length > 0 ? (
+										<ListView
+											locations={listLocations} // Use conditional list locations
 											onLocationHover={handleLocationHover}
 											hoveredLocation={hoveredLocation}
 											refreshFavorites={refreshFavorites}
 											userFavorites={userFavorites}
 										/>
 									) : (
-										<EmptyState message="No locations in current view. Try zooming out or changing filters." />
+										<EmptyState message="No locations found matching your criteria." />
 									)}
 								</div>
 							</div>
@@ -317,23 +314,30 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 					{/* Left side: Scrollable list of locations (60% on desktop) */}
 					<div className="w-[60%] h-full flex flex-col overflow-hidden border-r">
 						<div className="flex-1 overflow-y-auto h-screen">
-							{getVisibleLocations().length > 0 ? (
+							{listLocations.length > 0 ? (
 								<ListView
-									locations={getVisibleLocations()}
+									locations={listLocations} // Use conditional list locations
 									onLocationHover={handleLocationHover}
 									hoveredLocation={hoveredLocation}
 									refreshFavorites={refreshFavorites}
 									userFavorites={userFavorites}
 								/>
 							) : (
-								<EmptyState message="No locations in current view. Try zooming out or changing filters." />
+								<EmptyState message="No locations found matching your criteria." />
 							)}
 						</div>
 					</div>
 
 					{/* Right side: Fixed map (40% on desktop) with filters at the top-left */}
 					<div className="w-[40%] h-full relative">
-						<div className="absolute top-2 left-2 z-10">
+						{/* Filters Overlay */}
+						<div className="absolute top-2 left-2 z-10 flex gap-2 items-center bg-white/80 backdrop-blur-sm p-1 rounded-lg shadow">
+							<SearchInput
+								value={searchQuery}
+								onChange={handleSearchChange}
+								onClear={handleClearSearch}
+								className="w-48" // Adjust width as needed
+							/>
 							<CategoryFilter
 								categories={categories.map(cat => cat.name)}
 								onFilterChange={handleFilterChange}

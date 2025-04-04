@@ -18,6 +18,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { useFavorites } from "@/hooks/use-favorites"
 import { useItinerary } from "@/hooks/use-itinerary"
 import Image from "next/image"
+import SearchInput from "@/components/search-input"
 
 // Dynamically import MapView to avoid SSR issues with Leaflet
 const MapView = dynamic(() => import("@/components/map-view"), {
@@ -58,6 +59,7 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 	const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
 	const [selectedCategories, setSelectedCategories] = useState<string[]>([])
 	const [selectedDayIds, setSelectedDayIds] = useState<number[]>([])
+	const [searchQuery, setSearchQuery] = useState(''); // <-- New state for search
 	const [locationsToFit, setLocationsToFit] = useState<LocationData[] | null>(null) // State to trigger map bounds adjustment
 
 	const {
@@ -101,7 +103,7 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 		}
 	};
 
-	// Apply filters whenever selectedCategories, showOnlyFavorites, or selectedDayIds changes
+	// Apply filters whenever selectedCategories, showOnlyFavorites, selectedDayIds, or searchQuery changes
 	useEffect(() => {
 		let newFilteredLocations = initialLocations;
 
@@ -127,58 +129,44 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 			);
 		}
 
+		// Apply search filter if searchQuery is not empty
+		if (searchQuery.trim() !== '') {
+			const lowerCaseQuery = searchQuery.toLowerCase();
+			newFilteredLocations = newFilteredLocations.filter(location =>
+				location.name.toLowerCase().includes(lowerCaseQuery) ||
+				location.description.toLowerCase().includes(lowerCaseQuery) ||
+				location.category.toLowerCase().includes(lowerCaseQuery)
+			);
+		}
+
 		setFilteredLocations(newFilteredLocations);
 		// Set locations for the map to fit, triggering the one-time adjustment
 		setLocationsToFit(newFilteredLocations.length > 0 ? newFilteredLocations : null);
-	}, [initialLocations, selectedCategories, showOnlyFavorites, userFavorites, selectedDayIds, days]);
+	}, [initialLocations, selectedCategories, showOnlyFavorites, userFavorites, selectedDayIds, days, searchQuery]); // <-- Added searchQuery dependency
 
 	const handleFilterChange = (selectedCategories: string[]) => {
 		setSelectedCategories(selectedCategories);
-		let newFilteredLocations = initialLocations;
-
-		// Apply category filter
-		if (selectedCategories.length > 0) {
-			// Convert selected categories to lowercase for case-insensitive comparison
-			const lowerCaseSelectedCategories = selectedCategories.map(cat => cat.toLowerCase());
-
-			newFilteredLocations = newFilteredLocations.filter((location) =>
-				lowerCaseSelectedCategories.includes(location.category.toLowerCase())
-			);
-		}
-
-		// Apply favorites filter if enabled
-		if (showOnlyFavorites && userFavorites.length > 0) {
-			newFilteredLocations = newFilteredLocations.filter((location) =>
-				userFavorites.includes(location.id)
-			);
-		}
-
-		setFilteredLocations(newFilteredLocations);
-		// Trigger map adjustment
-		setLocationsToFit(newFilteredLocations.length > 0 ? newFilteredLocations : null);
+		// No need to set locationsToFit here, the useEffect will handle it
 	}
 
 	const handleFavoritesFilterChange = (showFavorites: boolean) => {
 		setShowOnlyFavorites(showFavorites);
-
-		let newFilteredLocations = initialLocations;
-
-		// Apply favorites filter
-		if (showFavorites && userFavorites.length > 0) {
-			newFilteredLocations = newFilteredLocations.filter((location) =>
-				userFavorites.includes(location.id)
-			);
-		}
-
-		setFilteredLocations(newFilteredLocations);
-		// Trigger map adjustment
-		setLocationsToFit(newFilteredLocations.length > 0 ? newFilteredLocations : null);
+		// No need to set locationsToFit here, the useEffect will handle it
 	}
 
 	const handleDayFilterChange = (newSelectedDayIds: number[]) => {
 		setSelectedDayIds(newSelectedDayIds);
-		// Trigger map adjustment based on the new day selection
-		// The main useEffect will recalculate filteredLocations and set locationsToFit
+		// No need to set locationsToFit here, the useEffect will handle it
+	}
+
+	const handleSearchChange = (value: string) => {
+		setSearchQuery(value);
+		// No need to set locationsToFit here, the useEffect will handle it
+	}
+
+	const handleClearSearch = () => {
+		setSearchQuery('');
+		// No need to set locationsToFit here, the useEffect will handle it
 	}
 
 	const handleBoundsFitted = useCallback(() => {
@@ -199,6 +187,7 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 	}
 
 	// Filter visible locations based on favorites if needed
+	// This remains unchanged, list view depends on this OR filteredLocations based on search
 	const getVisibleLocations = () => {
 		if (showOnlyFavorites && userFavorites.length > 0) {
 			return visibleLocations.filter(location =>
@@ -224,7 +213,7 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 		setLocationToAdd(null);
 	}
 
-	// Function to render popup content for the Planner view
+	// Function to render popup content for the Planner view (Unchanged)
 	const renderPlannerPopupContent = ({
 		location,
 		isLoggedIn,
@@ -251,16 +240,13 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 							e.stopPropagation();
 
 							if (!isLoggedIn) {
-								// Redirect to login if not logged in
 								window.open('/login', '_blank');
 								return;
 							}
 
 							if (isLoadingFavorite?.[location.id]) return;
 
-							// Toggle favorite status
 							const success = await toggleFavorite(location.id);
-							// Then refresh parent component state if needed
 							if (success && refreshFavorites) {
 								await refreshFavorites();
 							}
@@ -291,7 +277,6 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 					target="_blank"
 					className="block"
 					onClick={(e) => {
-						// Don't propagate if clicking on the Add to itinerary button
 						if ((e.target as HTMLElement).closest('button')) {
 							e.stopPropagation();
 						}
@@ -327,6 +312,9 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 			</div>
 		);
 	};
+
+	// Determine which locations to show in the list
+	const listLocations = searchQuery.trim() !== '' ? filteredLocations : getVisibleLocations();
 
 	return (
 		<div className="h-full flex flex-col">
@@ -396,23 +384,34 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 						</button>
 					</div>
 
+					{/* Mobile Search and Filters (Only for Map and List views) */}
+					{(mobileView === 'map' || mobileView === 'list') && (
+						<div className="p-2 bg-white border-b flex gap-2 items-center">
+							<SearchInput
+								value={searchQuery}
+								onChange={handleSearchChange}
+								onClear={handleClearSearch}
+								className="flex-grow"
+							/>
+							<CategoryFilter
+								categories={categories.map(cat => cat.name)}
+								onFilterChange={handleFilterChange}
+								onFavoritesFilterChange={handleFavoritesFilterChange}
+								refreshFavorites={refreshFavorites}
+							/>
+							<DayFilter
+								days={days}
+								selectedDayIds={selectedDayIds}
+								onDayFilterChange={handleDayFilterChange}
+							/>
+						</div>
+					)}
+
 					{/* Mobile content area */}
 					<div className="flex-1 overflow-hidden">
 						{mobileView === "map" && (
 							<div className="relative h-full">
-								<div className="absolute top-2 left-2 z-10 flex space-x-2">
-									<CategoryFilter
-										categories={categories.map(cat => cat.name)}
-										onFilterChange={handleFilterChange}
-										onFavoritesFilterChange={handleFavoritesFilterChange}
-										refreshFavorites={refreshFavorites}
-									/>
-									<DayFilter
-										days={days}
-										selectedDayIds={selectedDayIds}
-										onDayFilterChange={handleDayFilterChange} // Use the new handler
-									/>
-								</div>
+								{/* Filters are now above */}
 								<MapView
 									locations={filteredLocations}
 									onLocationHover={handleLocationHover}
@@ -427,15 +426,15 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 										isLoadingFavorite,
 										onAddToDay: showAddToDay
 									})}
-									locationToDayMap={locationToDayMap} // Pass the map instead of a function
-									locationsToFit={locationsToFit} // Pass locations to fit bounds
-									onBoundsFitted={handleBoundsFitted} // Pass callback
+									locationToDayMap={locationToDayMap}
+									locationsToFit={locationsToFit}
+									onBoundsFitted={handleBoundsFitted}
 								/>
 							</div>
 						)}
 						{mobileView === "list" && (
 							<ListView
-								locations={visibleLocations}
+								locations={listLocations} // Use conditional list locations
 								onLocationHover={handleLocationHover}
 								hoveredLocation={hoveredLocation}
 								refreshFavorites={refreshFavorites}
@@ -524,7 +523,7 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 					<div className="w-[30%] h-full flex flex-col border-r">
 						<div className="flex-1 overflow-y-auto">
 							<ListView
-								locations={visibleLocations}
+								locations={listLocations} // Use conditional list locations
 								onLocationHover={handleLocationHover}
 								hoveredLocation={hoveredLocation}
 								refreshFavorites={refreshFavorites}
@@ -536,7 +535,14 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 
 					{/* Right column: Map view */}
 					<div className="w-[40%] h-full relative">
-						<div className="absolute top-2 left-2 z-10 flex space-x-2">
+						{/* Filters Overlay */}
+						<div className="absolute top-2 left-2 z-10 flex gap-2 items-center bg-white/80 backdrop-blur-sm p-1 rounded-lg shadow">
+							<SearchInput
+								value={searchQuery}
+								onChange={handleSearchChange}
+								onClear={handleClearSearch}
+								className="w-48" // Adjust width as needed
+							/>
 							<CategoryFilter
 								categories={categories.map(cat => cat.name)}
 								onFilterChange={handleFilterChange}
@@ -546,7 +552,7 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 							<DayFilter
 								days={days}
 								selectedDayIds={selectedDayIds}
-								onDayFilterChange={handleDayFilterChange} // Use the new handler
+								onDayFilterChange={handleDayFilterChange}
 							/>
 						</div>
 						<MapView
@@ -563,9 +569,9 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 								isLoadingFavorite,
 								onAddToDay: showAddToDay
 							})}
-							locationToDayMap={locationToDayMap} // Pass the map instead of a function
-							locationsToFit={locationsToFit} // Pass locations to fit bounds
-							onBoundsFitted={handleBoundsFitted} // Pass callback
+							locationToDayMap={locationToDayMap}
+							locationsToFit={locationsToFit}
+							onBoundsFitted={handleBoundsFitted}
 						/>
 					</div>
 				</div>
