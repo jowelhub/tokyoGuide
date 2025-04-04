@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { MapPin } from "lucide-react"
 import Header from "@/components/layout/header"
+import Footer from "@/components/layout/footer"
 
 export default function HomePage() {
   return (
@@ -24,6 +25,7 @@ export default function HomePage() {
           </div>
         </div>
       </main>
+      <Footer /> {/* Add the Footer here */}
     </div>
   )
 }
