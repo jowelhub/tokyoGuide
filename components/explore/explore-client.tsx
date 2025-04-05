@@ -194,7 +194,8 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 					</div>
 
 					{/* Mobile bottom navigation - Adjusted layout */}
-					<div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t p-1 flex justify-around items-center h-[60px]"> {/* Set fixed height */}
+					{/* Adjusted z-index to be below header overlay (z-40) but above map/list content */}
+					<div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t p-1 flex justify-around items-center h-[60px]"> {/* Set fixed height */}
 						<button
 							onClick={() => setMobileView("map")}
 							className={cn(
