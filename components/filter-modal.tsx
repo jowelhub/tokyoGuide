@@ -44,14 +44,14 @@ export default function FilterModal({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 z-40"
+        className="fixed inset-0 bg-black/50 z-50" // Increased z-index for backdrop
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Modal Content */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[80vh] flex flex-col">
+      <div className="fixed inset-0 z-60 flex items-center justify-center p-4"> {/* Increased z-index for content */}
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[80vh] flex flex-col relative"> {/* Added relative */}
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b">
             <h2 className="text-lg font-medium">Filters</h2>

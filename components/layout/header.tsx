@@ -87,7 +87,7 @@ export default function Header() {
 
         {/* Mobile Menu Button */}
         <button
-          className="md:hidden z-60 focus:outline-none" /* Needs to be above menu content (z-50) */
+          className="md:hidden z-80 focus:outline-none" /* Increased z-index for button */
           onClick={toggleMobileMenu}
           aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
         >
@@ -98,8 +98,8 @@ export default function Header() {
         {mobileMenuOpen && (
           <>
             {/* Using standardized z-index values */}
-            <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden" onClick={() => setMobileMenuOpen(false)} /> {/* Use mobile-header-overlay level */}
-            <div className="fixed inset-x-0 top-0 bg-white/95 z-50 md:hidden flex flex-col pt-20 px-4 h-[100vh] animate-in slide-in-from-top duration-300"> {/* Use modal/menu content level */}
+            <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-60 md:hidden" onClick={() => setMobileMenuOpen(false)} /> {/* Increased z-index */}
+            <div className="fixed inset-x-0 top-0 bg-white/95 z-70 md:hidden flex flex-col pt-20 px-4 h-[100vh] animate-in slide-in-from-top duration-300"> {/* Increased z-index */}
               <nav className="flex flex-col items-center gap-6 text-lg">
                 <NavLink
                   href="/"
