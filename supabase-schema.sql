@@ -3,13 +3,14 @@
 -- ==================================
 -- Drop dependent objects first (functions, policies)
 DROP FUNCTION IF EXISTS public.update_itinerary(integer, jsonb);
+DROP FUNCTION IF EXISTS public.create_new_itinerary(text); -- Add drop for new function if needed
 
 DROP POLICY IF EXISTS "Allow public read access" ON public.locations;
 DROP POLICY IF EXISTS "Prevent public modification" ON public.locations;
 DROP POLICY IF EXISTS "Allow public read access" ON public.categories;
 DROP POLICY IF EXISTS "Prevent public modification" ON public.categories;
 DROP POLICY IF EXISTS "Allow individual user access" ON public.user_favorites;
-DROP POLICY IF EXISTS "Allow individual user access" ON public.user_itineraries;
+DROP POLICY IF EXISTS "Allow individual user access for itineraries" ON public.user_itineraries; -- Renamed for clarity
 DROP POLICY IF EXISTS "Allow access for itinerary owner" ON public.itinerary_days;
 DROP POLICY IF EXISTS "Allow access for itinerary owner" ON public.itinerary_locations;
 
@@ -37,7 +38,7 @@ CREATE TABLE public.locations (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   description TEXT NOT NULL,
-  category_id TEXT NOT NULL REFERENCES public.categories(id), -- Consider ON DELETE RESTRICT if categories are critical
+  category_id TEXT NOT NULL REFERENCES public.categories(id),
   latitude FLOAT NOT NULL,
   longitude FLOAT NOT NULL,
   images JSONB NOT NULL DEFAULT '[]'::jsonb
@@ -54,15 +55,16 @@ CREATE TABLE public.user_favorites (
 );
 COMMENT ON TABLE public.user_favorites IS 'Stores user favorite locations.';
 
--- Create user itineraries table
+-- Create user itineraries table (MODIFIED)
 CREATE TABLE public.user_itineraries (
   id SERIAL PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL, -- Added name field
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
-  UNIQUE(user_id) -- Assuming one itinerary per user for now
+  UNIQUE(user_id, name) -- Name must be unique per user
 );
-COMMENT ON TABLE public.user_itineraries IS 'Stores user trip itineraries.';
+COMMENT ON TABLE public.user_itineraries IS 'Stores user trip itineraries. Each user can have multiple itineraries with unique names.';
 
 -- Create itinerary days table
 CREATE TABLE public.itinerary_days (
@@ -140,6 +142,8 @@ VALUES
 CREATE INDEX IF NOT EXISTS idx_locations_category_id ON public.locations(category_id);
 CREATE INDEX IF NOT EXISTS idx_user_favorites_location_id ON public.user_favorites(location_id);
 -- user_id is already indexed by UNIQUE constraint on user_favorites
+CREATE INDEX IF NOT EXISTS idx_user_itineraries_user_id ON public.user_itineraries(user_id); -- Add index for user_id queries
+-- (user_id, name) is already indexed by UNIQUE constraint on user_itineraries
 CREATE INDEX IF NOT EXISTS idx_itinerary_days_itinerary_id ON public.itinerary_days(itinerary_id);
 -- (itinerary_id, day_number) is already indexed by UNIQUE constraint on itinerary_days
 CREATE INDEX IF NOT EXISTS idx_itinerary_locations_day_id ON public.itinerary_locations(day_id);
@@ -180,30 +184,42 @@ CREATE POLICY "Allow individual user access" ON public.user_favorites
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
--- Policies for user_itineraries (Only owner can manage their itinerary)
-CREATE POLICY "Allow individual user access" ON public.user_itineraries
+-- Policies for user_itineraries (Only owner can manage their itineraries)
+CREATE POLICY "Allow individual user access for itineraries" ON public.user_itineraries
   FOR ALL
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
 -- Policies for itinerary_days (Only owner of the parent itinerary can manage days)
+-- RLS checks that the user_id associated with the itinerary_id matches the authenticated user's ID.
 CREATE POLICY "Allow access for itinerary owner" ON public.itinerary_days
   FOR ALL
-  USING (itinerary_id IN (SELECT id FROM public.user_itineraries WHERE user_id = auth.uid()))
-  WITH CHECK (itinerary_id IN (SELECT id FROM public.user_itineraries WHERE user_id = auth.uid()));
+  USING (EXISTS (SELECT 1 FROM public.user_itineraries WHERE id = itinerary_id AND user_id = auth.uid()))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.user_itineraries WHERE id = itinerary_id AND user_id = auth.uid()));
 
 -- Policies for itinerary_locations (Only owner of the parent itinerary can manage locations within days)
+-- RLS checks ownership by joining through itinerary_days to user_itineraries.
 CREATE POLICY "Allow access for itinerary owner" ON public.itinerary_locations
   FOR ALL
-  USING (day_id IN (SELECT id FROM public.itinerary_days WHERE itinerary_id IN (SELECT id FROM public.user_itineraries WHERE user_id = auth.uid())))
-  WITH CHECK (day_id IN (SELECT id FROM public.itinerary_days WHERE itinerary_id IN (SELECT id FROM public.user_itineraries WHERE user_id = auth.uid())));
+  USING (EXISTS (
+    SELECT 1
+    FROM public.itinerary_days d
+    JOIN public.user_itineraries ui ON d.itinerary_id = ui.id
+    WHERE d.id = day_id AND ui.user_id = auth.uid()
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1
+    FROM public.itinerary_days d
+    JOIN public.user_itineraries ui ON d.itinerary_id = ui.id
+    WHERE d.id = day_id AND ui.user_id = auth.uid()
+  ));
 
 
 -- ==================================
 --          FUNCTIONS
 -- ==================================
 
--- Create update_itinerary function for atomically updating itineraries
+-- Create update_itinerary function for atomically updating a specific itinerary's content
 -- SECURITY INVOKER means the function runs with the permissions of the user calling it (relies on RLS policies above)
 CREATE OR REPLACE FUNCTION public.update_itinerary(_itinerary_id integer, _days_data jsonb)
 RETURNS void
@@ -216,7 +232,12 @@ DECLARE
     new_day_id integer;
     loc_index integer;
 BEGIN
-    -- Delete existing days and locations for this itinerary
+    -- Verify ownership before proceeding (although RLS should handle this, belt-and-suspenders)
+    IF NOT EXISTS (SELECT 1 FROM public.user_itineraries WHERE id = _itinerary_id AND user_id = auth.uid()) THEN
+        RAISE EXCEPTION 'User does not own itinerary %', _itinerary_id;
+    END IF;
+
+    -- Delete existing days and locations for this specific itinerary
     -- RLS policies defined above will ensure the user can only delete days/locations they own
     DELETE FROM public.itinerary_locations WHERE day_id IN (SELECT id FROM public.itinerary_days WHERE itinerary_id = _itinerary_id);
     DELETE FROM public.itinerary_days WHERE itinerary_id = _itinerary_id;
@@ -246,4 +267,30 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.update_itinerary(integer, jsonb) IS 'Atomically updates an itinerary by deleting existing days/locations and inserting the new structure provided in _days_data JSONB. Runs with invoker security, relying on RLS.';
+COMMENT ON FUNCTION public.update_itinerary(integer, jsonb) IS 'Atomically updates a specific itinerary''s content by deleting existing days/locations and inserting the new structure provided in _days_data JSONB. Runs with invoker security, relying on RLS.';
+
+-- Optional: Function to create a new itinerary and its first day (can be called from API)
+-- CREATE OR REPLACE FUNCTION public.create_new_itinerary(_user_id UUID, _name TEXT)
+-- RETURNS integer -- Returns the new itinerary ID
+-- LANGUAGE plpgsql
+-- SECURITY DEFINER -- Use DEFINER if you need to bypass RLS temporarily for creation, but ensure input validation. INVOKER is safer if API handles auth check.
+-- SET search_path = public
+-- AS $$
+-- DECLARE
+--     new_itinerary_id integer;
+-- BEGIN
+--     -- Insert the new itinerary
+--     INSERT INTO public.user_itineraries (user_id, name, created_at, updated_at)
+--     VALUES (_user_id, _name, NOW(), NOW())
+--     RETURNING id INTO new_itinerary_id;
+--
+--     -- Insert the default first day
+--     INSERT INTO public.itinerary_days (itinerary_id, day_number, created_at, updated_at)
+--     VALUES (new_itinerary_id, 1, NOW(), NOW());
+--
+--     RETURN new_itinerary_id;
+-- END;
+-- $$;
+-- COMMENT ON FUNCTION public.create_new_itinerary(UUID, TEXT) IS 'Creates a new itinerary for a user with the given name and adds a default Day 1.';
+-- -- Grant execute permission if needed (adjust role as necessary)
+-- -- GRANT EXECUTE ON FUNCTION public.create_new_itinerary(UUID, TEXT) TO authenticated;
