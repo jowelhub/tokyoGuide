@@ -4,6 +4,7 @@ import Link from "next/link"
 import { Home, Map, LogIn, UserPlus, Menu, X, Calendar } from "lucide-react"
 import { useState } from "react"
 import { useAuth } from "@/hooks/use-auth"
+import { cn } from "@/lib/utils"
 
 export default function Header() {
   const { user, isLoading, signOut } = useAuth()
@@ -45,7 +46,10 @@ export default function Header() {
             handleSignOut();
             if (isMobile) setMobileMenuOpen(false);
           }}
-          className={`flex items-center gap-2 hover:text-gray-600 bg-transparent border-none cursor-pointer ${isMobile ? 'text-lg' : 'text-sm'}`}
+          className={cn(
+            "flex items-center gap-2 hover:text-gray-600 bg-transparent border-none cursor-pointer",
+            isMobile ? 'text-lg' : 'text-sm'
+          )}
         >
           Sign Out
         </button>
@@ -72,7 +76,7 @@ export default function Header() {
 
   return (
     <header className="border-b">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+      <div className="container mx-auto px-4 h-16 flex items-center justify-between relative"> {/* Added relative for positioning context */}
         <Link href="/" className="text-xl font-bold flex items-center gap-2">
           Tokyo Guide
         </Link>
@@ -85,44 +89,53 @@ export default function Header() {
           <AuthSection />
         </nav>
 
-        {/* Mobile Menu Button */}
-        <button
-          className="md:hidden z-80 focus:outline-none" /* Increased z-index for button */
-          onClick={toggleMobileMenu}
-          aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
-        >
-          {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
+        {/* Mobile Menu OPEN Button */}
+        {/* Only show the Menu button if the menu is closed */}
+        {!mobileMenuOpen && (
+          <button
+            className="md:hidden z-20 focus:outline-none p-1"
+            onClick={toggleMobileMenu}
+            aria-label="Open menu"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+        )}
 
-        {/* Mobile Menu Overlay */}
+        {/* Mobile Menu Overlay - Full Screen White */}
         {mobileMenuOpen && (
-          <>
-            {/* Using standardized z-index values */}
-            <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-60 md:hidden" onClick={() => setMobileMenuOpen(false)} /> {/* Increased z-index */}
-            <div className="fixed inset-x-0 top-0 bg-white/95 z-70 md:hidden flex flex-col pt-20 px-4 h-[100vh] animate-in slide-in-from-top duration-300"> {/* Increased z-index */}
-              <nav className="flex flex-col items-center gap-6 text-lg">
-                <NavLink
-                  href="/"
-                  icon={<Home className="w-5 h-5" />}
-                  label="Home"
-                  onClick={() => setMobileMenuOpen(false)}
-                />
-                <NavLink
-                  href="/explore"
-                  icon={<Map className="w-5 h-5" />}
-                  label="Explore"
-                  onClick={() => setMobileMenuOpen(false)}
-                />
-                <NavLink
-                  href="/planner"
-                  icon={<Calendar className="w-5 h-5" />}
-                  label="Planner"
-                  onClick={() => setMobileMenuOpen(false)}
-                />
-                <AuthSection isMobile />
-              </nav>
-            </div>
-          </>
+          <div className="fixed inset-0 bg-white z-50 md:hidden flex flex-col items-center pt-20 px-4"> {/* Full screen, white bg, z-50 */}
+            {/* Mobile Menu CLOSE Button (Inside the full screen overlay) */}
+            <button
+              className="absolute top-4 right-4 p-2 text-gray-600 hover:text-gray-900 focus:outline-none rounded-full hover:bg-gray-100"
+              onClick={toggleMobileMenu}
+              aria-label="Close menu"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            {/* Navigation Links - Removed extra top margin */}
+            <nav className="flex flex-col items-center gap-6 text-lg">
+              <NavLink
+                href="/"
+                icon={<Home className="w-5 h-5" />}
+                label="Home"
+                onClick={() => setMobileMenuOpen(false)}
+              />
+              <NavLink
+                href="/explore"
+                icon={<Map className="w-5 h-5" />}
+                label="Explore"
+                onClick={() => setMobileMenuOpen(false)}
+              />
+              <NavLink
+                href="/planner"
+                icon={<Calendar className="w-5 h-5" />}
+                label="Planner"
+                onClick={() => setMobileMenuOpen(false)}
+              />
+              <AuthSection isMobile />
+            </nav>
+          </div>
         )}
       </div>
     </header>
