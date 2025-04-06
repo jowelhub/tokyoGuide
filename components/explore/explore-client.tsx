@@ -1,3 +1,4 @@
+// components/explore/explore-client.tsx
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
@@ -5,10 +6,11 @@ import dynamic from "next/dynamic"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import type { LocationData } from "@/lib/types"
 import type { CategoryData } from "@/lib/supabase/categories"
-import CategoryFilter from "../category-filter"
+import FilterModal from "../filter-modal"
 import ListView from "./explore-list-view"
 import EmptyState from "../empty-state"
 import { MapIcon, ListBulletIcon } from "@heroicons/react/24/outline"
+import { Filter } from "lucide-react" // Use lucide-react Filter
 import { useAuth } from "@/hooks/use-auth"
 import { useFavorites } from "@/hooks/use-favorites"
 import { XMarkIcon } from "@heroicons/react/24/outline"
@@ -17,6 +19,7 @@ import { HeartIcon as HeartOutline } from "@heroicons/react/24/outline"
 import Link from "next/link"
 import Image from "next/image"
 import SearchInput from "@/components/search-input"
+import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 // Dynamically import MapView to avoid SSR issues with Leaflet
@@ -42,17 +45,11 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 	const [selectedCategories, setSelectedCategories] = useState<string[]>([])
 	const [searchQuery, setSearchQuery] = useState('');
 	const [locationsToFit, setLocationsToFit] = useState<LocationData[] | null>(null)
+	const [isFilterModalOpen, setIsFilterModalOpen] = useState(false); // State for modal
 
 	// Function to refresh favorites
 	const refreshFavorites = async () => {
 		await fetchFavorites();
-		if (showOnlyFavorites) {
-			const newFilteredLocations = initialLocations.filter(location =>
-				userFavorites.includes(location.id) &&
-				(selectedCategories.length === 0 || selectedCategories.includes(location.category))
-			);
-			setFilteredLocations(newFilteredLocations);
-		}
 	};
 
 	// Apply filters
@@ -64,8 +61,9 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 			);
 		}
 		if (showOnlyFavorites) {
+			const currentFavorites = userFavorites;
 			newFilteredLocations = newFilteredLocations.filter(location =>
-				userFavorites.includes(location.id)
+				currentFavorites.includes(location.id)
 			);
 		}
 		if (searchQuery.trim() !== '') {
@@ -80,12 +78,22 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 		setLocationsToFit(newFilteredLocations.length > 0 ? newFilteredLocations : null)
 	}, [initialLocations, selectedCategories, showOnlyFavorites, userFavorites, searchQuery])
 
-	const handleFilterChange = (selectedCategories: string[]) => {
-		setSelectedCategories(selectedCategories);
-	}
-	const handleFavoritesFilterChange = (showFavorites: boolean) => {
-		setShowOnlyFavorites(showFavorites);
-	}
+	// Filter Handlers for Modal
+	const handleCategoryToggle = (category: string) => {
+		setSelectedCategories(prev =>
+			prev.includes(category)
+				? prev.filter(c => c !== category)
+				: [...prev, category]
+		);
+	};
+	const handleFavoriteToggle = async () => {
+		const newShowOnlyFavorites = !showOnlyFavorites;
+		setShowOnlyFavorites(newShowOnlyFavorites);
+		if (newShowOnlyFavorites) {
+			await refreshFavorites();
+		}
+	};
+
 	const handleSearchChange = (value: string) => {
 		setSearchQuery(value);
 	}
@@ -105,12 +113,8 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 
 	// Filter visible locations
 	const getVisibleLocations = () => {
-		if (showOnlyFavorites && userFavorites.length > 0) {
-			return visibleLocations.filter(location =>
-				userFavorites.includes(location.id),
-			);
-		}
-		return visibleLocations;
+		const boundsFiltered = filteredLocations;
+		return visibleLocations.filter(visLoc => boundsFiltered.some(filtLoc => filtLoc.id === visLoc.id));
 	}
 
 	// Function to render popup content for the Explore view
@@ -123,7 +127,6 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 		onClosePopup,
 		refreshFavorites,
 	}: import("../map-view").PopupContentProps) => {
-		// (Popup content remains the same as previous version)
 		return (
 			<Link href={`/location/${location.id}`} target="_blank" className="block relative">
 				<div className="airbnb-popup-close absolute right-2 top-2 bg-white rounded-full w-8 h-8 flex items-center justify-center z-10 cursor-pointer shadow-sm" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClosePopup(); }}>
@@ -132,7 +135,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 				<div className="airbnb-popup-content">
 					<div className="relative w-full h-0 pb-[56.25%]">
 						<Image src={location.images[0] || "/placeholder.svg"} alt={location.name} fill className="object-cover" />
-						<div className="airbnb-popup-heart absolute left-2 top-2 bg-white rounded-full w-8 h-8 flex items-center justify-center z-10 cursor-pointer shadow-sm" onClick={async (e) => { e.preventDefault(); e.stopPropagation(); if (!isLoggedIn) { window.open('/login', '_blank'); return; } if (isLoadingFavorite?.[location.id]) return; const success = await toggleFavorite(location.id); if (success && refreshFavorites) { await refreshFavorites(); } if (success && !isFavorited(location.id) && document.querySelector('[data-favorites-filter="true"]')) { onClosePopup(); } }} title={isLoggedIn ? (isFavorited(location.id) ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}>
+						<div className="airbnb-popup-heart absolute left-2 top-2 bg-white rounded-full w-8 h-8 flex items-center justify-center z-10 cursor-pointer shadow-sm" onClick={async (e) => { e.preventDefault(); e.stopPropagation(); if (!isLoggedIn) { window.open('/login', '_blank'); return; } if (isLoadingFavorite?.[location.id]) return; const success = await toggleFavorite(location.id); if (success && refreshFavorites) { await refreshFavorites(); } if (success && !isFavorited(location.id) && showOnlyFavorites) { onClosePopup(); } }} title={isLoggedIn ? (isFavorited(location.id) ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}>
 							{isFavorited(location.id) ? <HeartSolid className="w-5 h-5 text-red-500" /> : <HeartOutline className="w-5 h-5 text-gray-700" />}
 						</div>
 					</div>
@@ -147,27 +150,52 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 	};
 
 	// Determine which locations to show in the list
-	const listLocations = searchQuery.trim() !== '' ? filteredLocations : getVisibleLocations();
+	const listLocations = searchQuery.trim() !== '' || selectedCategories.length > 0 || showOnlyFavorites
+		? filteredLocations
+		: getVisibleLocations();
+
+	// Calculate filter count for badge
+	const filterCount = selectedCategories.length + (showOnlyFavorites ? 1 : 0);
 
 	// Calculate bottom padding needed for mobile views
-	const mobileBottomPadding = "pb-[60px]"; // Adjust this value based on the final height of the bottom nav
+	const mobileBottomPadding = "pb-[60px]";
 
 	return (
 		<div className="flex-1 flex flex-col h-full">
+			{/* Filter Modal */}
+			<FilterModal
+				isOpen={isFilterModalOpen}
+				onClose={() => setIsFilterModalOpen(false)}
+				categories={categories.map(cat => cat.name)}
+				selectedCategories={selectedCategories}
+				onCategoryToggle={handleCategoryToggle}
+				showFavoritesFilter={isLoggedIn}
+				isFavoriteSelected={showOnlyFavorites}
+				onFavoriteToggle={handleFavoriteToggle}
+				showDayFilter={false}
+			/>
+
 			{/* Mobile: Toggle between map and list views */}
 			{isMobile ? (
 				<div className="h-full relative flex flex-col">
 					{/* Mobile Search and Filters */}
 					<div className="p-2 bg-white border-b flex gap-2 items-center">
 						<SearchInput value={searchQuery} onChange={handleSearchChange} onClear={handleClearSearch} className="flex-grow" />
-						<CategoryFilter categories={categories.map(cat => cat.name)} onFilterChange={handleFilterChange} onFavoritesFilterChange={handleFavoritesFilterChange} refreshFavorites={refreshFavorites} />
+						<Button variant="outline" size="sm" className="gap-1.5" onClick={() => setIsFilterModalOpen(true)}>
+							<Filter className="h-4 w-4" /> {/* Use lucide-react Filter */}
+							<span>Filters</span>
+							{filterCount > 0 && (
+								<span className="ml-1 rounded-full bg-primary text-primary-foreground px-2 py-0.5 text-xs">
+									{filterCount}
+								</span>
+							)}
+						</Button>
 					</div>
 
 					{/* Mobile content area */}
-					<div className="flex-1 overflow-hidden"> {/* Removed pb-16 here */}
-						{/* Map View */}
+					<div className="flex-1 overflow-hidden">
 						{mobileView === "map" && (
-							<div className={cn("relative h-full", mobileBottomPadding)}> {/* Added padding here */}
+							<div className={cn("relative h-full", mobileBottomPadding)}>
 								<MapView
 									locations={filteredLocations}
 									onLocationHover={handleLocationHover}
@@ -180,10 +208,8 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 								/>
 							</div>
 						)}
-
-						{/* List View */}
 						{mobileView === "list" && (
-							<div className={cn("h-full overflow-y-auto", mobileBottomPadding)}> {/* Added padding here */}
+							<div className={cn("h-full overflow-y-auto", mobileBottomPadding)}>
 								{listLocations.length > 0 ? (
 									<ListView locations={listLocations} onLocationHover={handleLocationHover} hoveredLocation={hoveredLocation} refreshFavorites={refreshFavorites} userFavorites={userFavorites} />
 								) : (
@@ -193,12 +219,12 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 						)}
 					</div>
 
-					{/* Mobile bottom navigation - Adjusted layout */}
-					<div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t p-1 flex justify-around items-center h-[60px]"> {/* Use mobile-nav level */}
+					{/* Mobile bottom navigation */}
+					<div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t p-1 flex justify-around items-center h-[60px]">
 						<button
 							onClick={() => setMobileView("map")}
 							className={cn(
-								"flex-1 py-1 px-2 rounded-md flex items-center justify-center gap-1.5 text-xs h-full", // Use h-full
+								"flex-1 py-1 px-2 rounded-md flex items-center justify-center gap-1.5 text-xs h-full",
 								mobileView === "map" ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-50"
 							)}
 						>
@@ -208,7 +234,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 						<button
 							onClick={() => setMobileView("list")}
 							className={cn(
-								"flex-1 py-1 px-2 rounded-md flex items-center justify-center gap-1.5 text-xs h-full", // Use h-full
+								"flex-1 py-1 px-2 rounded-md flex items-center justify-center gap-1.5 text-xs h-full",
 								mobileView === "list" ? "bg-blue-100 text-blue-700" : "text-gray-600 hover:bg-gray-50"
 							)}
 						>
@@ -218,9 +244,8 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 					</div>
 				</div>
 			) : (
-				/* Desktop: Side by side layout (60% list, 40% map) - Remains unchanged */
+				/* Desktop: Side by side layout */
 				<div className="flex-1 flex flex-row overflow-hidden h-full">
-					{/* Left side: Scrollable list of locations (60% on desktop) */}
 					<div className="w-[60%] h-full flex flex-col overflow-hidden border-r">
 						<div className="flex-1 overflow-y-auto h-screen">
 							{listLocations.length > 0 ? (
@@ -230,15 +255,29 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 							)}
 						</div>
 					</div>
-
-					{/* Right side: Fixed map (40% on desktop) with filters at the top-left */}
 					<div className="w-[40%] h-full relative">
-						{/* Filters Overlay */}
-						<div className="absolute top-2 left-2 z-10 flex gap-2 items-center bg-white/80 backdrop-blur-sm p-1 rounded-lg shadow"> {/* Use map-ui level */}
+						<div className="absolute top-2 left-2 z-10 flex gap-2 items-center bg-white/80 backdrop-blur-sm p-1 rounded-lg shadow">
 							<SearchInput value={searchQuery} onChange={handleSearchChange} onClear={handleClearSearch} className="w-48" />
-							<CategoryFilter categories={categories.map(cat => cat.name)} onFilterChange={handleFilterChange} onFavoritesFilterChange={handleFavoritesFilterChange} refreshFavorites={refreshFavorites} />
+							<Button variant="outline" size="sm" className="gap-1.5" onClick={() => setIsFilterModalOpen(true)}>
+								<Filter className="h-4 w-4" /> {/* Use lucide-react Filter */}
+								<span>Filters</span>
+								{filterCount > 0 && (
+									<span className="ml-1 rounded-full bg-primary text-primary-foreground px-2 py-0.5 text-xs">
+										{filterCount}
+									</span>
+								)}
+							</Button>
 						</div>
-						<MapView locations={filteredLocations} onLocationHover={handleLocationHover} hoveredLocation={hoveredLocation} onViewportChange={handleViewportChange} refreshFavorites={refreshFavorites} renderPopupContent={(props) => renderExplorePopupContent({ ...props, isLoggedIn, isFavorited, toggleFavorite, isLoadingFavorite })} locationsToFit={locationsToFit} onBoundsFitted={handleBoundsFitted} />
+						<MapView
+							locations={filteredLocations}
+							onLocationHover={handleLocationHover}
+							hoveredLocation={hoveredLocation}
+							onViewportChange={handleViewportChange}
+							refreshFavorites={refreshFavorites}
+							renderPopupContent={(props) => renderExplorePopupContent({ ...props, isLoggedIn, isFavorited, toggleFavorite, isLoadingFavorite })}
+							locationsToFit={locationsToFit}
+							onBoundsFitted={handleBoundsFitted}
+						/>
 					</div>
 				</div>
 			)}
