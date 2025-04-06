@@ -60,6 +60,17 @@ export default function Header() {
     </Link>
   );
 
+  // Helper function to get the display name (first name or "User")
+  const getDisplayName = (user: any): string => {
+    if (!user) return "User";
+    const fullName = user.user_metadata?.full_name;
+    if (fullName && typeof fullName === 'string') {
+      return fullName.split(' ')[0]; // Return first name
+    }
+    // Fallback if full_name is not available or not a string
+    return "User";
+  };
+
   // Auth section component for Desktop
   const AuthSectionDesktop = () => {
     // Wait for initialization before deciding what to render
@@ -67,7 +78,7 @@ export default function Header() {
 
     if (user) {
       const avatarUrl = user.user_metadata?.avatar_url;
-      const userName = user.user_metadata?.full_name || user.email || "User"; // Fallback name
+      const displayName = getDisplayName(user);
 
       return (
         // Button styled like the example, triggers sign out
@@ -79,15 +90,15 @@ export default function Header() {
           {avatarUrl ? (
             <Image
               src={avatarUrl}
-              alt={userName}
+              alt={displayName} // Use displayName for alt text
               width={24}
               height={24}
               className="rounded-full"
             />
           ) : (
-            <DefaultUserIcon className="w-6 h-6" />
+            <DefaultUserIcon className="w-6 h-6" /> // Use default icon
           )}
-          <span className="text-sm font-medium truncate max-w-[100px]">{userName}</span>
+          <span className="text-sm font-medium truncate max-w-[100px]">{displayName}</span>
         </Button>
       );
     }
@@ -111,14 +122,14 @@ export default function Header() {
     if (!isInitialized) return null; // Don't show anything in mobile menu until initialized
 
     if (user) {
-      const userName = user.user_metadata?.full_name || user.email || "User";
+      const displayName = getDisplayName(user);
       return (
         <button
           onClick={handleSignOut}
           className="flex items-center gap-3 py-3 text-lg hover:text-gray-600 w-full justify-center text-red-600" // Sign out styling
         >
           <LogOut className="w-5 h-5" />
-          Sign Out ({userName})
+          Sign Out ({displayName})
         </button>
       );
     }
