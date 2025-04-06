@@ -251,7 +251,7 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 			{/* Add to day selector */}
 			{showDaySelector && locationToAdd && (
 				<div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-					<div className="bg-white rounded-lg p-6 max-w-sm w-full">
+					<div className="bg-white rounded-lg p-6 max-w-sm w-full z-50"> {/* Modal content needs z-50 */}
 						<h3 className="text-lg font-medium mb-4">Add to Day</h3>
 						<div className="space-y-2 max-h-60 overflow-y-auto">
 							{days.map((day) => (
@@ -264,6 +264,7 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 							<button onClick={hideAddToDay} className="px-4 py-2 border rounded hover:bg-gray-100">Cancel</button>
 						</div>
 					</div>
+					<div className="fixed inset-0 z-40" onClick={hideAddToDay}></div> {/* Modal backdrop needs z-40 */}
 				</div>
 			)}
 
@@ -332,7 +333,7 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 					</div>
 
 					{/* Mobile bottom navigation - Adjusted layout */}
-					<div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t p-1 flex justify-around items-center h-[60px]"> {/* Set fixed height */}
+					<div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t p-1 flex justify-around items-center h-[60px]"> {/* Use mobile-nav level */}
 						<button
 							onClick={() => setMobileView("map")}
 							className={cn(
@@ -399,7 +400,7 @@ export default function PlannerClient({ initialLocations, categories }: PlannerC
 					{/* Right column: Map view */}
 					<div className="w-[40%] h-full relative">
 						{/* Filters Overlay */}
-						<div className="absolute top-2 left-2 z-10 flex gap-2 items-center bg-white/80 backdrop-blur-sm p-1 rounded-lg shadow">
+						<div className="absolute top-2 left-2 z-10 flex gap-2 items-center bg-white/80 backdrop-blur-sm p-1 rounded-lg shadow"> {/* Use map-ui level */}
 							<SearchInput value={searchQuery} onChange={handleSearchChange} onClear={handleClearSearch} className="w-48" />
 							<CategoryFilter categories={categories.map(cat => cat.name)} onFilterChange={handleFilterChange} onFavoritesFilterChange={handleFavoritesFilterChange} refreshFavorites={refreshFavorites} />
 							<DayFilter days={days} selectedDayIds={selectedDayIds} onDayFilterChange={handleDayFilterChange} />

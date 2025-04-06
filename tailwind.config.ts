@@ -19,6 +19,17 @@ const config: Config = {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
+      zIndex: {
+        '0': '0',       // Base layer (e.g., map container)
+        '10': '10',     // UI elements directly on the map/page (e.g., map controls, desktop filters)
+        '20': '20',     // Mobile bottom navigation
+        '30': '30',     // Mobile header overlay backdrop
+        '40': '40',     // Mobile header content / Modal backdrop
+        '50': '50',     // Sticky headers / Modals / Dialogs / Mobile Menu Content
+        '60': '60',     // Dropdowns (e.g., filter dropdowns)
+        '70': '70',     // Tooltips (if needed, higher than dropdowns)
+        'auto': 'auto',
+      },
       colors: {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',

@@ -12,7 +12,7 @@ export default async function PlannerPage() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      <div className="sticky top-0 z-50 w-full bg-white">
+      <div className="sticky top-0 z-50 w-full bg-white"> {/* Use modal/sticky header level */}
         <Header />
       </div>
       <div className="flex-1 overflow-hidden">

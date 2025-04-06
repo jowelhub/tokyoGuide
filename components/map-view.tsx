@@ -119,7 +119,7 @@ function CustomZoomControl() {
 
   return (
     // Group buttons visually, add rounded corners, adjust spacing from bottom
-    <div className="absolute bottom-6 right-4 z-[1000] flex flex-col overflow-hidden rounded-md border bg-white shadow">
+    <div className="absolute bottom-6 right-4 z-10 flex flex-col overflow-hidden rounded-md border bg-white shadow"> {/* Use map-ui level */}
       <Button
         variant="outline"
         size="icon"
@@ -325,7 +325,7 @@ export default function MapView({
 	}
 
 	return (
-		<div className="h-full w-full relative z-0">
+		<div className="h-full w-full relative z-0"> {/* Base map container */}
 			<MapContainer
 				center={MAP_CONFIG.defaultCenter}
 				zoom={MAP_CONFIG.defaultZoom}

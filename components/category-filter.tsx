@@ -86,7 +86,7 @@ export default function CategoryFilter({
       </Button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-56 rounded-md border bg-white shadow-lg z-[1000]">
+        <div className="absolute top-full left-0 mt-1 w-56 rounded-md border bg-white shadow-lg z-60"> {/* Use dropdown level */}
           <div className="p-2">
             {isLoggedIn && (
               <>

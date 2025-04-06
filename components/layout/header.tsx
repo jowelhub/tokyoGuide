@@ -73,7 +73,7 @@ export default function Header() {
   return (
     <header className="border-b">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link href="/" className="text-xl font-bold flex items-center gap-2 z-10">
+        <Link href="/" className="text-xl font-bold flex items-center gap-2">
           Tokyo Guide
         </Link>
 
@@ -87,7 +87,7 @@ export default function Header() {
 
         {/* Mobile Menu Button */}
         <button
-          className="md:hidden z-10 focus:outline-none"
+          className="md:hidden z-60 focus:outline-none" /* Needs to be above menu content (z-50) */
           onClick={toggleMobileMenu}
           aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
         >
@@ -97,9 +97,9 @@ export default function Header() {
         {/* Mobile Menu Overlay */}
         {mobileMenuOpen && (
           <>
-            {/* Increased z-index for overlay and menu content */}
-            <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden" onClick={() => setMobileMenuOpen(false)} />
-            <div className="fixed inset-x-0 top-0 bg-white/95 z-50 md:hidden flex flex-col pt-20 px-4 h-[100vh] animate-in slide-in-from-top duration-300">
+            {/* Using standardized z-index values */}
+            <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 md:hidden" onClick={() => setMobileMenuOpen(false)} /> {/* Use mobile-header-overlay level */}
+            <div className="fixed inset-x-0 top-0 bg-white/95 z-50 md:hidden flex flex-col pt-20 px-4 h-[100vh] animate-in slide-in-from-top duration-300"> {/* Use modal/menu content level */}
               <nav className="flex flex-col items-center gap-6 text-lg">
                 <NavLink
                   href="/"

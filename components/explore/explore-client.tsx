@@ -194,8 +194,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 					</div>
 
 					{/* Mobile bottom navigation - Adjusted layout */}
-					{/* Adjusted z-index to be below header overlay (z-40) but above map/list content */}
-					<div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t p-1 flex justify-around items-center h-[60px]"> {/* Set fixed height */}
+					<div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t p-1 flex justify-around items-center h-[60px]"> {/* Use mobile-nav level */}
 						<button
 							onClick={() => setMobileView("map")}
 							className={cn(
@@ -235,7 +234,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 					{/* Right side: Fixed map (40% on desktop) with filters at the top-left */}
 					<div className="w-[40%] h-full relative">
 						{/* Filters Overlay */}
-						<div className="absolute top-2 left-2 z-10 flex gap-2 items-center bg-white/80 backdrop-blur-sm p-1 rounded-lg shadow">
+						<div className="absolute top-2 left-2 z-10 flex gap-2 items-center bg-white/80 backdrop-blur-sm p-1 rounded-lg shadow"> {/* Use map-ui level */}
 							<SearchInput value={searchQuery} onChange={handleSearchChange} onClear={handleClearSearch} className="w-48" />
 							<CategoryFilter categories={categories.map(cat => cat.name)} onFilterChange={handleFilterChange} onFavoritesFilterChange={handleFavoritesFilterChange} refreshFavorites={refreshFavorites} />
 						</div>
