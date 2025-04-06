@@ -1,6 +1,6 @@
 // /hooks/use-itinerary.ts
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth } from '@/hooks/use-auth'; // Corrected import path if needed
 import type { LocationData, ItineraryDay } from '@/lib/types';
 
 // Debounce delay for saving changes (1.5 seconds)
@@ -17,21 +17,23 @@ export function useItinerary(
 ) {
     // State
     const [days, setDays] = useState<ItineraryDay[]>(initialDays);
-    // Loading is true only if no initial data is provided AND we haven't fetched yet.
+    // Loading is true only if no initial data is provided AND we haven't fetched yet OR auth is still loading.
     const [isLoading, setIsLoading] = useState(() => !initialDays || initialDays.length === 0);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // References
-    const isInitialized = useRef(!!initialDays && initialDays.length > 0);
+    const isItineraryDataInitialized = useRef(!!initialDays && initialDays.length > 0); // Renamed for clarity
     const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
     const hasPendingChanges = useRef(false);
 
     // Auth state
-    const { user, isLoggedIn, isLoading: isAuthLoading } = useAuth();
+    // Destructure isInitialized from useAuth and rename it to avoid conflict
+    const { user, isLoggedIn, isLoading: isAuthLoading, isInitialized: isAuthInitialized } = useAuth();
 
     // --- Fetching Logic (Primarily for fallback/refresh) ---
     const fetchItinerary = useCallback(async (idToFetch: number, showLoadingIndicator = true) => {
+        // This check might be redundant now due to the useEffect logic, but keep for safety
         if (!isLoggedIn) {
             setError("Not logged in.");
             setIsLoading(false);
@@ -60,7 +62,7 @@ export function useItinerary(
             console.log(`[useItinerary] Successfully loaded itinerary: ${itineraryData.id}`);
 
             setDays(itineraryData.days || []); // Update state with fetched data
-            isInitialized.current = true;
+            isItineraryDataInitialized.current = true; // Mark as initialized with fetched data
 
         } catch (err: any) {
             console.error('[useItinerary] Error loading itinerary:', err);
@@ -73,46 +75,51 @@ export function useItinerary(
 
     // --- Initialization Effect (REVISED) ---
     useEffect(() => {
-        // 1. Wait for authentication status to be determined
-        if (isAuthLoading) {
-            console.log('[useItinerary Init] Waiting for auth...');
+        // 1. Wait for authentication status AND initialization to be determined
+        if (isAuthLoading || !isAuthInitialized) { // <-- Added !isAuthInitialized check
+            console.log('[useItinerary Init] Waiting for auth initialization...');
             // Keep isLoading true if we don't have initial data yet
-            if (!isInitialized.current) {
+            if (!isItineraryDataInitialized.current) {
                 setIsLoading(true);
             }
-            return;
+            return; // Exit effect until auth is fully initialized
         }
+
+        // --- Auth is now fully initialized ---
+        console.log(`[useItinerary Init] Auth initialized. isLoggedIn: ${isLoggedIn}, itineraryId: ${itineraryId}, itineraryDataInitialized: ${isItineraryDataInitialized.current}`);
 
         // 2. Handle cases based on auth status and itineraryId AFTER auth check
         if (isLoggedIn && itineraryId) {
             // Logged in and have an ID
-            if (!isInitialized.current) {
+            if (!isItineraryDataInitialized.current) {
                 // No initial data was successfully passed or processed, fetch now
                 console.log(`[useItinerary Init] Auth ready, no initial data for ${itineraryId}, fetching...`);
                 fetchItinerary(itineraryId, true); // Show loading indicator
             } else {
                 // Already initialized with data from props, ensure loading is false
                 console.log(`[useItinerary Init] Auth ready, already initialized for ${itineraryId}.`);
-                setIsLoading(false);
+                setIsLoading(false); // Ensure loading is false if we used initial data
                 setError(null); // Clear any potential previous errors
             }
         } else if (!isLoggedIn && itineraryId) {
             // Logged out, but trying to access a specific itinerary page
             console.log(`[useItinerary Init] Auth ready, but user is logged out while accessing ${itineraryId}.`);
-            setError("You have been logged out. Please log in again to manage this itinerary.");
-            setIsLoading(false); // Stop loading, show error
+            // Don't set the error here anymore, let the page redirect handle it.
+            // setError("You need to be logged in to view this itinerary."); // REMOVED/COMMENTED
+            setIsLoading(false); // Stop loading
             // setDays([]); // Optionally clear data
         } else if (!itineraryId) {
-            // No itinerary ID provided (shouldn't happen in this page structure, but good safeguard)
+            // No itinerary ID provided (e.g., on /planner dashboard)
             console.log(`[useItinerary Init] Auth ready, but no itineraryId provided.`);
-            setError("No itinerary selected.");
+            // setError("No itinerary selected."); // Not really an error state for the dashboard
             setIsLoading(false);
         } else {
              // Catch-all for logged out on dashboard (no itineraryId) - do nothing, isLoading false
              setIsLoading(false);
         }
 
-    }, [isLoggedIn, isAuthLoading, itineraryId, fetchItinerary]); // Dependencies
+    // Added isAuthInitialized to dependencies
+    }, [isLoggedIn, isAuthLoading, isAuthInitialized, itineraryId, fetchItinerary]);
 
 
     // --- Modification Functions ---
@@ -146,12 +153,10 @@ export function useItinerary(
         console.log(`[useItinerary] Removing day: ${dayIdToRemove}`);
         modifyDays((currentDays) => {
             const daysWithoutRemoved = currentDays.filter(day => day.id !== dayIdToRemove);
-            const renumberedDays = daysWithoutRemoved.map(day => {
-                if (day.id > dayIdToRemove) {
-                    return { ...day, id: day.id - 1 };
-                }
-                return day;
-            }).sort((a, b) => a.id - b.id); // Ensure sorted order
+            // Renumber days sequentially starting from 1
+            const renumberedDays = daysWithoutRemoved.map((day, index) => {
+                 return { ...day, id: index + 1 };
+            }).sort((a, b) => a.id - b.id); // Ensure sorted order just in case
             console.log(`[useItinerary] Days after removing ${dayIdToRemove}:`, renumberedDays.map(d => d.id));
             return renumberedDays;
         });
@@ -187,7 +192,9 @@ export function useItinerary(
     // --- Saving Logic ---
     useEffect(() => {
         // Conditions to prevent saving
-        if (!itineraryId || !isLoggedIn || isAuthLoading || !isInitialized.current) {
+        // Ensure auth is initialized AND user is logged in AND itinerary data is initialized
+        if (!itineraryId || !isAuthInitialized || !isLoggedIn || isAuthLoading || !isItineraryDataInitialized.current) {
+             console.log(`[useItinerary Save Effect] Skipping save check. Conditions: itineraryId=${itineraryId}, isAuthInitialized=${isAuthInitialized}, isLoggedIn=${isLoggedIn}, isAuthLoading=${isAuthLoading}, isItineraryDataInitialized=${isItineraryDataInitialized.current}`);
             return;
         }
 
@@ -198,7 +205,7 @@ export function useItinerary(
             }
 
             saveTimerRef.current = setTimeout(async () => {
-                // Re-check conditions before making the API call
+                // Re-check conditions before making the API call (belt-and-suspenders)
                 if (!itineraryId || !isLoggedIn) {
                     console.log('[useItinerary Save] Skipping save: Conditions not met after debounce.');
                     setIsSaving(false);
@@ -209,13 +216,14 @@ export function useItinerary(
                 console.log('[useItinerary Save] Debounce complete, saving changes to itinerary ID:', itineraryId);
                 setIsSaving(true);
                 setError(null);
+                const currentDaysState = days; // Capture current state for the save operation
                 hasPendingChanges.current = false; // Reset flag before async call
 
                 try {
                     const response = await fetch(`/api/itineraries/${itineraryId}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ days }), // Send the current state of 'days'
+                        body: JSON.stringify({ days: currentDaysState }), // Send the captured state
                     });
 
                     if (!response.ok) {
@@ -229,7 +237,8 @@ export function useItinerary(
                 } catch (err: any) {
                     console.error('[useItinerary Save] Error saving itinerary:', err);
                     setError(`Failed to save: ${err.message}. Changes might be lost.`);
-                    // Consider re-marking as pending on error?
+                    // Consider re-marking as pending on error? Or potentially revert state?
+                    // For now, just show error. User might need to refresh.
                     // hasPendingChanges.current = true;
                 } finally {
                     setIsSaving(false);
@@ -243,13 +252,15 @@ export function useItinerary(
                 clearTimeout(saveTimerRef.current);
             }
         };
-    }, [days, itineraryId, isLoggedIn, isAuthLoading]); // Depend on 'days' to trigger save
+    // Depend on 'days' stringified to trigger save accurately when content changes
+    }, [JSON.stringify(days), itineraryId, isLoggedIn, isAuthInitialized, isAuthLoading]);
 
 
     // --- Return Values ---
     return {
         days,
-        isLoading: isLoading || isAuthLoading, // Combine loading states
+        // Combine loading states: true if auth is loading OR itinerary data isn't initialized yet
+        isLoading: isAuthLoading || isLoading,
         isSaving,
         error,
         addDay,

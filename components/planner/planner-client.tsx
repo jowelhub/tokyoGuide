@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 // Dynamically import MapView
 const MapView = dynamic(() => import("@/components/map-view"), {
     ssr: false,
+    // Keep a minimal loading state for the map itself if needed, or remove
     loading: () => <div className="h-full w-full bg-gray-100 flex items-center justify-center">Loading map...</div>,
 });
 
@@ -64,7 +65,7 @@ export default function PlannerClient({
         removeDay,
         addLocationToDay,
         removeLocationFromDay,
-        isLoading: isItineraryLoading,
+        isLoading: isItineraryLoading, // Still need the variable, just won't use it for the main loader
         isSaving,
         error: itineraryError
     } = useItinerary(itineraryId, initialItineraryData);
@@ -175,6 +176,7 @@ export default function PlannerClient({
     const renderPlannerPopupContent = ({
         location, isLoggedIn, isFavorited, toggleFavorite, isLoadingFavorite, onClosePopup, refreshFavorites
     }: import("@/components/map-view").PopupContentProps) => {
+        // ... (keep popup rendering logic as is) ...
         return (
             <div className="airbnb-popup-content">
                 {/* Image and Heart/Close Buttons */}
@@ -187,7 +189,7 @@ export default function PlannerClient({
                             if (!isLoggedIn) { window.open('/login', '_blank'); return; }
                             if (isLoadingFavorite?.[location.id]) return;
                             const success = await toggleFavorite(location.id);
-                            if (success && fetchFavorites) await fetchFavorites();
+                            if (success && fetchFavorites) await fetchFavorites(); // Use fetchFavorites here
                         }}
                         title={isLoggedIn ? (isFavorited(location.id) ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}
                     >
@@ -223,15 +225,19 @@ export default function PlannerClient({
     const listLocations = useMemo(() => {
         const hasFilters = searchQuery.trim() !== '' || selectedCategories.length > 0 || showOnlyFavorites || selectedDayIds.length > 0;
         const baseList = hasFilters ? filteredLocations : visibleLocations;
+        // Ensure locations in the list are also present in the currently filtered set
         return baseList.filter(visLoc => filteredLocations.some(filtLoc => filtLoc.id === visLoc.id));
     }, [searchQuery, selectedCategories, showOnlyFavorites, selectedDayIds, filteredLocations, visibleLocations]);
 
 
     // --- Main Render ---
 
-    if (isItineraryLoading) {
-        return <div className="h-full w-full flex items-center justify-center text-gray-500">Loading your itinerary...</div>;
-    }
+    // REMOVED the isItineraryLoading check here
+    // if (isItineraryLoading) {
+    //     return <div className="h-full w-full flex items-center justify-center text-gray-500">Loading your itinerary...</div>;
+    // }
+
+    // Keep the error check
     if (itineraryError) {
         return (
             <div className="h-full w-full flex flex-col items-center justify-center text-red-600 p-6 text-center">
@@ -245,6 +251,7 @@ export default function PlannerClient({
 
     const mobileBottomPadding = "pb-[60px]";
 
+    // The rest of the return statement remains the same...
     return (
         <div className="h-full flex flex-col">
             {/* --- Modals --- */}
@@ -314,7 +321,7 @@ export default function PlannerClient({
                                     onLocationHover={handleLocationHover}
                                     hoveredLocation={hoveredLocation}
                                     onViewportChange={handleViewportChange}
-                                    refreshFavorites={fetchFavorites}
+                                    refreshFavorites={fetchFavorites} // Pass fetchFavorites
                                     renderPopupContent={(props) => renderPlannerPopupContent({ ...props, isLoggedIn, isFavorited, toggleFavorite, isLoadingFavorite })}
                                     locationToDayMap={locationToDayMap}
                                     locationsToFit={locationsToFit}
@@ -329,7 +336,7 @@ export default function PlannerClient({
                                         locations={listLocations}
                                         onLocationHover={handleLocationHover}
                                         hoveredLocation={hoveredLocation}
-                                        refreshFavorites={fetchFavorites}
+                                        refreshFavorites={fetchFavorites} // Pass fetchFavorites
                                         userFavorites={userFavorites}
                                         onAddToDay={handleShowAddToDayModal}
                                     />
@@ -427,7 +434,7 @@ export default function PlannerClient({
                                     locations={listLocations}
                                     onLocationHover={handleLocationHover}
                                     hoveredLocation={hoveredLocation}
-                                    refreshFavorites={fetchFavorites}
+                                    refreshFavorites={fetchFavorites} // Pass fetchFavorites
                                     userFavorites={userFavorites}
                                     onAddToDay={handleShowAddToDayModal}
                                 />
@@ -456,7 +463,7 @@ export default function PlannerClient({
                             onLocationHover={handleLocationHover}
                             hoveredLocation={hoveredLocation}
                             onViewportChange={handleViewportChange}
-                            refreshFavorites={fetchFavorites}
+                            refreshFavorites={fetchFavorites} // Pass fetchFavorites
                             renderPopupContent={(props) => renderPlannerPopupContent({ ...props, isLoggedIn, isFavorited, toggleFavorite, isLoadingFavorite })}
                             locationToDayMap={locationToDayMap}
                             locationsToFit={locationsToFit}
