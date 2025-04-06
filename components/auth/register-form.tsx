@@ -2,26 +2,19 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 
 export function RegisterForm() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [warning, setWarning] = useState<string | null>(null);
   const router = useRouter();
-  const { isLoggedIn } = useAuth();
-  
+  const { isLoggedIn } = useAuth(); // Keep useAuth if needed elsewhere, or remove if not
+
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError(null);
-    setWarning(null);
-    
+
     try {
       // For OAuth, we still need to use the browser client
       // Use dynamic import to only load it when needed
@@ -30,58 +23,24 @@ export function RegisterForm() {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
-      
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
-      
+
       if (error) {
         setError(error.message);
       }
+      // No need to redirect here, the callback route handles it
     } catch (err) {
-      setError("An unexpected error occurred");
-      console.error("Google sign-in error:", err);
+      setError("An unexpected error occurred during Google sign-up");
+      console.error("Google sign-up error:", err);
     } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setWarning(null);
-
-    try {
-      const response = await fetch('/api/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ email, password })
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        setError(data.error || 'Failed to register');
-        return;
-      }
-      
-      if (data.warning) {
-        setWarning(data.warning);
-      }
-      
-      router.push("/explore");
-      router.refresh();
-    } catch (err) {
-      setError("An unexpected error occurred");
-      console.error("Registration error:", err);
-    } finally {
-      setLoading(false);
+      // Keep loading false unless the redirect happens immediately
+      // setLoading(false); // Often the page redirects before this runs
     }
   };
 
@@ -89,7 +48,7 @@ export function RegisterForm() {
     <div className="space-y-6">
       <div className="text-center">
         <h1 className="text-2xl font-bold">Create an Account</h1>
-        <p className="text-sm text-gray-500 mt-2">Sign up to access your Tokyo Guide</p>
+        <p className="text-sm text-gray-500 mt-2">Use Google to sign up for Tokyo Guide</p>
       </div>
 
       {error && (
@@ -98,48 +57,7 @@ export function RegisterForm() {
         </div>
       )}
 
-      {warning && (
-        <div className="bg-yellow-50 text-yellow-600 p-3 rounded-md text-sm">
-          {warning}
-        </div>
-      )}
-
-      <form onSubmit={handleRegister} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            placeholder="you@example.com"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            placeholder="Create a secure password"
-          />
-        </div>
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "Creating account..." : "Register"}
-        </Button>
-      </form>
-      
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-200"></div>
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-white px-2 text-gray-500">Or continue with</span>
-        </div>
-      </div>
+      {/* Removed warning state as it was tied to email/password flow */}
 
       <Button
         type="button"
@@ -171,17 +89,10 @@ export function RegisterForm() {
           />
           <path d="M1 1h22v22H1z" fill="none" />
         </svg>
-        Sign in with Google
+        {loading ? "Redirecting..." : "Sign up with Google"}
       </Button>
 
-      <div className="text-center text-sm">
-        <p>
-          Already have an account?{" "}
-          <Link href="/login" className="text-blue-600 hover:underline">
-            Sign in
-          </Link>
-        </p>
-      </div>
+      {/* Removed email/password form and sign-in link */}
     </div>
   );
 }
