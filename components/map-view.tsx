@@ -1,3 +1,4 @@
+// components/map-view.tsx
 "use client"
 
 import React, { useState, useEffect, useRef } from "react"
@@ -119,7 +120,7 @@ function CustomZoomControl() {
 
   return (
     // Group buttons visually, add rounded corners, adjust spacing from bottom
-    <div className="absolute bottom-6 right-4 z-10 flex flex-col overflow-hidden rounded-md border bg-white shadow"> {/* Use map-ui level */}
+    <div className="absolute bottom-6 right-4 z-[1000] flex flex-col overflow-hidden rounded-md border bg-white shadow"> {/* Use very high z-index */}
       <Button
         variant="outline"
         size="icon"
