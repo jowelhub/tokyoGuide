@@ -1,25 +1,25 @@
--- Drop existing policies first if they exist (optional but good for clean reset)
-DROP POLICY IF EXISTS "Allow authenticated read access" ON public.locations;
+-- ==================================
+--          DROP STATEMENTS
+-- ==================================
+-- Drop dependent objects first (functions, policies)
+DROP FUNCTION IF EXISTS public.update_itinerary(integer, jsonb);
+
+DROP POLICY IF EXISTS "Allow public read access" ON public.locations;
 DROP POLICY IF EXISTS "Prevent public modification" ON public.locations;
-DROP POLICY IF EXISTS "Allow authenticated read access" ON public.categories;
+DROP POLICY IF EXISTS "Allow public read access" ON public.categories;
 DROP POLICY IF EXISTS "Prevent public modification" ON public.categories;
 DROP POLICY IF EXISTS "Allow individual user access" ON public.user_favorites;
 DROP POLICY IF EXISTS "Allow individual user access" ON public.user_itineraries;
 DROP POLICY IF EXISTS "Allow access for itinerary owner" ON public.itinerary_days;
 DROP POLICY IF EXISTS "Allow access for itinerary owner" ON public.itinerary_locations;
 
--- Drop dependent tables first
+-- Drop tables in reverse order of dependency
 DROP TABLE IF EXISTS public.itinerary_locations;
 DROP TABLE IF EXISTS public.itinerary_days;
 DROP TABLE IF EXISTS public.user_itineraries;
 DROP TABLE IF EXISTS public.user_favorites;
-
--- Then drop the tables they depend on
 DROP TABLE IF EXISTS public.locations;
 DROP TABLE IF EXISTS public.categories;
-
--- Drop the function if it exists
-DROP FUNCTION IF EXISTS public.update_itinerary(integer, jsonb);
 
 -- ==================================
 --          TABLE CREATION
@@ -37,7 +37,7 @@ CREATE TABLE public.locations (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   description TEXT NOT NULL,
-  category_id TEXT NOT NULL REFERENCES public.categories(id), -- ON DELETE RESTRICT might be safer if categories are critical
+  category_id TEXT NOT NULL REFERENCES public.categories(id), -- Consider ON DELETE RESTRICT if categories are critical
   latitude FLOAT NOT NULL,
   longitude FLOAT NOT NULL,
   images JSONB NOT NULL DEFAULT '[]'::jsonb
@@ -48,7 +48,7 @@ COMMENT ON TABLE public.locations IS 'Stores details about visitable locations.'
 CREATE TABLE public.user_favorites (
   id SERIAL PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  location_id TEXT NOT NULL REFERENCES public.locations(id) ON DELETE CASCADE, -- Cascade delete ok if location removal means favorite is irrelevant
+  location_id TEXT NOT NULL REFERENCES public.locations(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
   UNIQUE(user_id, location_id)
 );
@@ -68,7 +68,7 @@ COMMENT ON TABLE public.user_itineraries IS 'Stores user trip itineraries.';
 CREATE TABLE public.itinerary_days (
   id SERIAL PRIMARY KEY,
   itinerary_id INTEGER NOT NULL REFERENCES public.user_itineraries(id) ON DELETE CASCADE,
-  day_number INTEGER NOT NULL CHECK (day_number > 0), -- Added CHECK constraint
+  day_number INTEGER NOT NULL CHECK (day_number > 0),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
   UNIQUE(itinerary_id, day_number)
@@ -79,8 +79,8 @@ COMMENT ON TABLE public.itinerary_days IS 'Stores individual days within an itin
 CREATE TABLE public.itinerary_locations (
   id SERIAL PRIMARY KEY,
   day_id INTEGER NOT NULL REFERENCES public.itinerary_days(id) ON DELETE CASCADE,
-  location_id TEXT NOT NULL REFERENCES public.locations(id) ON DELETE CASCADE, -- Cascade delete ok if location removal means itinerary item is irrelevant
-  position INTEGER NOT NULL CHECK (position >= 0), -- Added CHECK constraint
+  location_id TEXT NOT NULL REFERENCES public.locations(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL CHECK (position >= 0),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
   UNIQUE(day_id, location_id),
   UNIQUE(day_id, position) -- Ensure position is unique within a day
@@ -105,7 +105,7 @@ VALUES
   ('theater', 'Theater'),
   ('nightlife', 'Nightlife');
 
--- Insert locations (Ensure images are valid JSONB arrays)
+-- Insert locations (Ensure images are valid JSONB arrays with double quotes)
 INSERT INTO public.locations (id, name, description, category_id, latitude, longitude, images)
 VALUES
   ('meiji-shrine', 'Meiji Shrine', 'A Shinto shrine dedicated to Emperor Meiji and Empress Shoken, set in a peaceful forest in the heart of Tokyo.', 'shrine', 35.6764, 139.6993, '["https://images.unsplash.com/photo-1624253321171-1be53e12f5f4"]'),
@@ -139,32 +139,34 @@ VALUES
 
 CREATE INDEX IF NOT EXISTS idx_locations_category_id ON public.locations(category_id);
 CREATE INDEX IF NOT EXISTS idx_user_favorites_location_id ON public.user_favorites(location_id);
--- user_id is already indexed by UNIQUE constraint
+-- user_id is already indexed by UNIQUE constraint on user_favorites
 CREATE INDEX IF NOT EXISTS idx_itinerary_days_itinerary_id ON public.itinerary_days(itinerary_id);
--- (itinerary_id, day_number) is already indexed by UNIQUE constraint
+-- (itinerary_id, day_number) is already indexed by UNIQUE constraint on itinerary_days
 CREATE INDEX IF NOT EXISTS idx_itinerary_locations_day_id ON public.itinerary_locations(day_id);
--- (day_id, location_id) is already indexed by UNIQUE constraint
+-- (day_id, location_id) is already indexed by UNIQUE constraint on itinerary_locations
 CREATE INDEX IF NOT EXISTS idx_itinerary_locations_location_id ON public.itinerary_locations(location_id);
--- (day_id, position) is already indexed by UNIQUE constraint
+-- (day_id, position) is already indexed by UNIQUE constraint on itinerary_locations
 
 -- ==================================
 --      ROW LEVEL SECURITY (RLS)
 -- ==================================
 -- IMPORTANT: Enable RLS for all tables containing user data or accessed by users
 
--- Public tables (read-only for authenticated users)
+-- Public tables (read-only for everyone, modification restricted)
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.locations ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow authenticated read access" ON public.categories
-  FOR SELECT USING (auth.role() = 'authenticated');
-CREATE POLICY "Prevent public modification" ON public.categories
-  FOR ALL USING (false); -- Effectively blocks INSERT, UPDATE, DELETE for non-admins
+CREATE POLICY "Allow public read access" ON public.categories
+  FOR SELECT USING (true); -- Allows anyone (logged in or anon) to read
 
-CREATE POLICY "Allow authenticated read access" ON public.locations
-  FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Prevent public modification" ON public.categories
+  FOR ALL USING (false); -- Effectively blocks INSERT, UPDATE, DELETE for non-admins/supabase_admin
+
+CREATE POLICY "Allow public read access" ON public.locations
+  FOR SELECT USING (true); -- Allows anyone (logged in or anon) to read
+
 CREATE POLICY "Prevent public modification" ON public.locations
-  FOR ALL USING (false); -- Effectively blocks INSERT, UPDATE, DELETE for non-admins
+  FOR ALL USING (false); -- Effectively blocks INSERT, UPDATE, DELETE for non-admins/supabase_admin
 
 -- User specific tables
 ALTER TABLE public.user_favorites ENABLE ROW LEVEL SECURITY;
