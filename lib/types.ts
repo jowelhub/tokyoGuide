@@ -1,3 +1,4 @@
+// lib/types.ts
 export interface LocationData {
   id: string
   name: string
@@ -5,6 +6,7 @@ export interface LocationData {
   category: string
   coordinates: [number, number]
   images: string[]
+  details_markdown?: string // Added markdown field (optional)
 }
 
 export interface ItineraryDay {
@@ -31,4 +33,3 @@ export interface MapViewProps {
   onViewportChange: (locationsInViewport: LocationData[]) => void
   refreshFavorites?: () => Promise<void>
 }
-

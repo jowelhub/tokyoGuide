@@ -54,12 +54,15 @@
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.2.0",
     "react-leaflet": "^4.2.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "tailwind-merge": "^2.5.5",
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.2.2"
   },
   "devDependencies": {
+    "@tailwindcss/typography": "^0.5.16",
     "@types/node": "^18.17.19",
     "@types/react": "^18.2.21",
     "@types/react-dom": "^18.2.7",
