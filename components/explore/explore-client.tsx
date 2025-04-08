@@ -1,7 +1,7 @@
 // components/explore/explore-client.tsx
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react" // Added useMemo
 import dynamic from "next/dynamic"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import type { LocationData } from "@/lib/types"
@@ -9,11 +9,10 @@ import type { CategoryData } from "@/lib/supabase/categories"
 import FilterModal from "../filter-modal"
 import ListView from "./explore-list-view"
 import EmptyState from "../empty-state"
-import { MapIcon, ListBulletIcon } from "@heroicons/react/24/outline"
-import { Filter } from "lucide-react" // Use lucide-react Filter
+import { MapIcon, ListBulletIcon, XMarkIcon as CloseIcon } from "@heroicons/react/24/outline" // Renamed XMarkIcon
+import { Filter, Wand2, Loader2, XCircleIcon } from "lucide-react" // Added Wand2, Loader2, XCircleIcon
 import { useAuth } from "@/hooks/use-auth"
 import { useFavorites } from "@/hooks/use-favorites"
-import { XMarkIcon } from "@heroicons/react/24/outline"
 import { HeartIcon as HeartSolid } from "@heroicons/react/24/solid"
 import { HeartIcon as HeartOutline } from "@heroicons/react/24/outline"
 import Link from "next/link"
@@ -36,50 +35,98 @@ interface ExploreClientProps {
 export default function ExploreClient({ initialLocations, categories }: ExploreClientProps) {
 	const { isLoggedIn } = useAuth();
 	const { favorites: userFavorites, refreshFavorites: fetchFavorites, toggleFavorite, isFavorited, isLoading: isLoadingFavorite } = useFavorites();
+
+	// --- State ---
 	const [filteredLocations, setFilteredLocations] = useState<LocationData[]>(initialLocations)
 	const [hoveredLocation, setHoveredLocation] = useState<LocationData | null>(null)
 	const [visibleLocations, setVisibleLocations] = useState<LocationData[]>(initialLocations)
 	const isMobile = useMediaQuery("(max-width: 768px)")
-	const [mobileView, setMobileView] = useState<"map" | "list">("map") // Default to map view on mobile
+	const [mobileView, setMobileView] = useState<"map" | "list">("map")
 	const [showOnlyFavorites, setShowOnlyFavorites] = useState(false)
 	const [selectedCategories, setSelectedCategories] = useState<string[]>([])
 	const [searchQuery, setSearchQuery] = useState('');
 	const [locationsToFit, setLocationsToFit] = useState<LocationData[] | null>(null)
-	const [isFilterModalOpen, setIsFilterModalOpen] = useState(false); // State for modal
+	const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+	// AI Search State
+	const [isAiSearchLoading, setIsAiSearchLoading] = useState(false);
+	const [aiSearchResultIds, setAiSearchResultIds] = useState<string[] | null>(null);
+	const [aiSearchError, setAiSearchError] = useState<string | null>(null);
 
-	// Function to refresh favorites
+	// --- Derived State ---
+	const isAiSearchActive = useMemo(() => aiSearchResultIds !== null, [aiSearchResultIds]);
+
+	// --- Handlers ---
 	const refreshFavorites = async () => {
 		await fetchFavorites();
 	};
 
-	// Apply filters
+	// Apply filters (including AI search results)
 	useEffect(() => {
 		let newFilteredLocations = initialLocations;
-		if (selectedCategories.length > 0) {
-			newFilteredLocations = newFilteredLocations.filter(location =>
-				selectedCategories.includes(location.category)
+
+		// --- AI Search Filter (Overrides others if active) ---
+		if (isAiSearchActive) {
+			console.log('[ExploreClient] AI Search is active. Filtering by AI results:', aiSearchResultIds);
+			newFilteredLocations = initialLocations.filter(location =>
+				// FIX: Use nullish coalescing operator to provide default empty array
+				(aiSearchResultIds ?? []).includes(location.id)
 			);
+		} else {
+			// --- Regular Filters (Only apply if AI search is NOT active) ---
+			console.log('[ExploreClient] AI Search inactive. Applying regular filters.');
+			if (selectedCategories.length > 0) {
+				newFilteredLocations = newFilteredLocations.filter(location =>
+					selectedCategories.includes(location.category)
+				);
+			}
+			if (showOnlyFavorites) {
+				const currentFavorites = userFavorites; // Use latest favorites
+				newFilteredLocations = newFilteredLocations.filter(location =>
+					currentFavorites.includes(location.id)
+				);
+			}
+			if (searchQuery.trim() !== '') {
+				const lowerCaseQuery = searchQuery.toLowerCase();
+				newFilteredLocations = newFilteredLocations.filter(location =>
+					location.name.toLowerCase().includes(lowerCaseQuery) ||
+					location.description.toLowerCase().includes(lowerCaseQuery) ||
+					location.category.toLowerCase().includes(lowerCaseQuery)
+				);
+			}
 		}
-		if (showOnlyFavorites) {
-			const currentFavorites = userFavorites;
-			newFilteredLocations = newFilteredLocations.filter(location =>
-				currentFavorites.includes(location.id)
-			);
+
+		setFilteredLocations(newFilteredLocations);
+
+		// Trigger map fit only when filters change, not just viewport changes
+		// And only if AI search is not active (AI search handles its own fitting)
+		// Or if AI search just finished (aiSearchResultIds changed)
+		if (newFilteredLocations.length > 0) {
+			// Don't fit if only the search query changed, let user explore map
+			if (!isAiSearchActive && searchQuery.trim() === '') {
+				setLocationsToFit(newFilteredLocations);
+			} else if (isAiSearchActive) {
+				// Fit is handled by handleAiSearch completion
+			} else {
+				 setLocationsToFit(null); // Don't fit while typing search query
+			}
+		} else {
+			setLocationsToFit(null); // No locations to fit
 		}
-		if (searchQuery.trim() !== '') {
-			const lowerCaseQuery = searchQuery.toLowerCase();
-			newFilteredLocations = newFilteredLocations.filter(location =>
-				location.name.toLowerCase().includes(lowerCaseQuery) ||
-				location.description.toLowerCase().includes(lowerCaseQuery) ||
-				location.category.toLowerCase().includes(lowerCaseQuery)
-			);
-		}
-		setFilteredLocations(newFilteredLocations)
-		setLocationsToFit(newFilteredLocations.length > 0 ? newFilteredLocations : null)
-	}, [initialLocations, selectedCategories, showOnlyFavorites, userFavorites, searchQuery])
+
+	}, [
+		initialLocations,
+		selectedCategories,
+		showOnlyFavorites,
+		userFavorites, // Re-run if favorites change (for the filter)
+		searchQuery,
+		isAiSearchActive, // Add dependency
+		aiSearchResultIds // Add dependency
+	]);
+
 
 	// Filter Handlers for Modal
 	const handleCategoryToggle = (category: string) => {
+		setAiSearchResultIds(null); // Clear AI search when changing filters
 		setSelectedCategories(prev =>
 			prev.includes(category)
 				? prev.filter(c => c !== category)
@@ -87,6 +134,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 		);
 	};
 	const handleFavoriteToggle = async () => {
+		setAiSearchResultIds(null); // Clear AI search when changing filters
 		const newShowOnlyFavorites = !showOnlyFavorites;
 		setShowOnlyFavorites(newShowOnlyFavorites);
 		if (newShowOnlyFavorites) {
@@ -95,9 +143,11 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 	};
 
 	const handleSearchChange = (value: string) => {
+		setAiSearchResultIds(null); // Clear AI search when typing new query
 		setSearchQuery(value);
 	}
 	const handleClearSearch = () => {
+		setAiSearchResultIds(null); // Clear AI search when clearing text search
 		setSearchQuery('');
 	}
 	const handleLocationHover = (location: LocationData | null) => {
@@ -111,10 +161,66 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 		setLocationsToFit(null);
 	}, []);
 
-	// Filter visible locations
+	// --- AI Search Handler ---
+	const handleAiSearch = async () => {
+		if (!searchQuery.trim() || isAiSearchLoading) return;
+
+		console.log('[ExploreClient] Starting AI Search for:', searchQuery);
+		setIsAiSearchLoading(true);
+		setAiSearchError(null);
+		setAiSearchResultIds(null); // Clear previous results
+
+		try {
+			const response = await fetch('/api/explore/search', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ userQuery: searchQuery }),
+			});
+
+			const result = await response.json();
+
+			if (!response.ok) {
+				throw new Error(result.error || `AI search failed (status ${response.status})`);
+			}
+
+			console.log('[ExploreClient] AI Search successful, results:', result.matchingLocationIds);
+			setAiSearchResultIds(result.matchingLocationIds || []);
+
+			// Trigger map fit after results are set
+			const matchingLocations = initialLocations.filter(loc =>
+				(result.matchingLocationIds || []).includes(loc.id)
+			);
+			setLocationsToFit(matchingLocations.length > 0 ? matchingLocations : null);
+
+
+		} catch (err: any) {
+			console.error("[ExploreClient] AI Search Error:", err);
+			setAiSearchError(err.message || "An unexpected error occurred during AI search.");
+			setAiSearchResultIds(null); // Ensure results are cleared on error
+		} finally {
+			setIsAiSearchLoading(false);
+		}
+	};
+
+	// --- Clear AI Search Handler ---
+	const handleClearAiSearch = () => {
+		console.log('[ExploreClient] Clearing AI Search results.');
+		setAiSearchResultIds(null);
+		setAiSearchError(null);
+		// Optionally clear the text search query too, or leave it for regular search
+		// setSearchQuery('');
+
+		// Re-trigger fit based on other filters
+		// The main useEffect will handle this when aiSearchResultIds becomes null
+	};
+
+
+	// Filter visible locations based on map bounds AND current filters
 	const getVisibleLocations = () => {
-		const boundsFiltered = filteredLocations;
-		return visibleLocations.filter(visLoc => boundsFiltered.some(filtLoc => filtLoc.id === visLoc.id));
+		// `filteredLocations` already incorporates AI search results if active
+		return visibleLocations.filter(visLoc =>
+			filteredLocations.some(filtLoc => filtLoc.id === visLoc.id)
+		);
 	}
 
 	// Function to render popup content for the Explore view
@@ -129,8 +235,9 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 	}: import("../map-view").PopupContentProps) => {
 		return (
 			<Link href={`/location/${location.id}`} target="_blank" className="block relative">
+				{/* Use CloseIcon alias */}
 				<div className="airbnb-popup-close absolute right-2 top-2 bg-white rounded-full w-8 h-8 flex items-center justify-center z-10 cursor-pointer shadow-sm" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClosePopup(); }}>
-					<XMarkIcon className="w-5 h-5 text-gray-700" />
+					<CloseIcon className="w-5 h-5 text-gray-700" />
 				</div>
 				<div className="airbnb-popup-content">
 					<div className="relative w-full h-0 pb-[56.25%]">
@@ -150,11 +257,18 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 	};
 
 	// Determine which locations to show in the list
-	const listLocations = searchQuery.trim() !== '' || selectedCategories.length > 0 || showOnlyFavorites
-		? filteredLocations
-		: getVisibleLocations();
+	const listLocations = useMemo(() => {
+		// If AI search is active, list shows only AI results
+		if (isAiSearchActive) {
+			return filteredLocations;
+		}
+		// Otherwise, show locations based on viewport + other filters
+		const hasFilters = searchQuery.trim() !== '' || selectedCategories.length > 0 || showOnlyFavorites;
+		const baseList = hasFilters ? filteredLocations : getVisibleLocations();
+		return baseList;
+	}, [isAiSearchActive, filteredLocations, searchQuery, selectedCategories, showOnlyFavorites, visibleLocations]); // Removed getVisibleLocations from deps
 
-	// Calculate filter count for badge
+	// Calculate filter count for badge (excluding AI search)
 	const filterCount = selectedCategories.length + (showOnlyFavorites ? 1 : 0);
 
 	// Calculate bottom padding needed for mobile views
@@ -172,32 +286,61 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 				showFavoritesFilter={isLoggedIn}
 				isFavoriteSelected={showOnlyFavorites}
 				onFavoriteToggle={handleFavoriteToggle}
-				showDayFilter={false}
+				showDayFilter={false} // Not needed in explore
 			/>
 
 			{/* Mobile: Toggle between map and list views */}
 			{isMobile ? (
 				<div className="h-full relative flex flex-col">
 					{/* Mobile Search and Filters */}
-					<div className="p-2 bg-white border-b flex gap-2 items-center">
-						<SearchInput value={searchQuery} onChange={handleSearchChange} onClear={handleClearSearch} className="flex-grow" />
-						<Button variant="outline" size="sm" className="gap-1.5" onClick={() => setIsFilterModalOpen(true)}>
-							<Filter className="h-4 w-4" /> {/* Use lucide-react Filter */}
-							<span>Filters</span>
-							{filterCount > 0 && (
-								<span className="ml-1 rounded-full bg-primary text-primary-foreground px-2 py-0.5 text-xs">
+					<div className="p-2 bg-white border-b flex gap-2 items-center sticky top-0 z-10">
+						<SearchInput value={searchQuery} onChange={handleSearchChange} onClear={handleClearSearch} className="flex-grow" placeholder="Search or ask AI..." />
+						{/* AI Search Trigger Button */}
+						<Button
+							variant="outline"
+							size="sm"
+							className="gap-1.5"
+							onClick={handleAiSearch}
+							disabled={isAiSearchLoading || !searchQuery.trim()}
+							title="Search with AI"
+						>
+							{isAiSearchLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+							<span className="sr-only">AI Search</span>
+						</Button>
+						{/* Filter Button */}
+						<Button variant="outline" size="sm" className="gap-1.5 relative" onClick={() => setIsFilterModalOpen(true)}>
+							<Filter className="h-4 w-4" />
+							<span className="hidden sm:inline">Filters</span>
+							{filterCount > 0 && !isAiSearchActive && ( // Hide badge if AI search is active
+								<span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">
 									{filterCount}
 								</span>
 							)}
 						</Button>
 					</div>
 
+					{/* AI Search Active Indicator / Clear Button */}
+					{isAiSearchActive && (
+						<div className="p-2 bg-blue-50 border-b text-center text-sm text-blue-700 flex justify-between items-center">
+							<span>Showing AI search results</span>
+							<Button variant="ghost" size="sm" onClick={handleClearAiSearch} className="text-blue-700 hover:bg-blue-100 h-7 px-2">
+								<XCircleIcon className="w-4 h-4 mr-1" /> Clear
+							</Button>
+						</div>
+					)}
+					{/* AI Search Error Message */}
+					{aiSearchError && (
+						<div className="p-2 bg-red-50 border-b text-center text-sm text-red-700">
+							AI Search Error: {aiSearchError}
+						</div>
+					)}
+
 					{/* Mobile content area */}
 					<div className="flex-1 overflow-hidden">
 						{mobileView === "map" && (
 							<div className={cn("relative h-full", mobileBottomPadding)}>
 								<MapView
-									locations={filteredLocations}
+									locations={filteredLocations} // Always show filtered locations on map
 									onLocationHover={handleLocationHover}
 									hoveredLocation={hoveredLocation}
 									onViewportChange={handleViewportChange}
@@ -213,7 +356,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 								{listLocations.length > 0 ? (
 									<ListView locations={listLocations} onLocationHover={handleLocationHover} hoveredLocation={hoveredLocation} refreshFavorites={refreshFavorites} userFavorites={userFavorites} />
 								) : (
-									<EmptyState message="No locations found matching your criteria." />
+									<EmptyState message={isAiSearchActive ? "AI found no matching locations." : "No locations found."} description="Try adjusting your search or filters." />
 								)}
 							</div>
 						)}
@@ -244,32 +387,63 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
 					</div>
 				</div>
 			) : (
-				/* Desktop: Side by side layout */
+				/* --- Desktop: Side by side layout (60% List / 40% Map) --- */
 				<div className="flex-1 flex flex-row overflow-hidden h-full">
-					<div className="w-[60%] h-full flex flex-col overflow-hidden border-r">
-						<div className="flex-1 overflow-y-auto h-screen">
+					{/* Left Column: List View */}
+					<div className="w-[60%] h-full flex flex-col overflow-hidden border-r"> {/* Corrected width */}
+						{/* AI Search Active Indicator / Clear Button */}
+						{isAiSearchActive && (
+							<div className="p-2 bg-blue-50 border-b text-center text-sm text-blue-700 flex justify-between items-center flex-shrink-0">
+								<span>Showing AI search results</span>
+								<Button variant="ghost" size="sm" onClick={handleClearAiSearch} className="text-blue-700 hover:bg-blue-100 h-7 px-2">
+									<XCircleIcon className="w-4 h-4 mr-1" /> Clear
+								</Button>
+							</div>
+						)}
+						{/* AI Search Error Message */}
+						{aiSearchError && (
+							<div className="p-2 bg-red-50 border-b text-center text-sm text-red-700 flex-shrink-0">
+								AI Search Error: {aiSearchError}
+							</div>
+						)}
+						<div className="flex-1 overflow-y-auto">
 							{listLocations.length > 0 ? (
 								<ListView locations={listLocations} onLocationHover={handleLocationHover} hoveredLocation={hoveredLocation} refreshFavorites={refreshFavorites} userFavorites={userFavorites} />
 							) : (
-								<EmptyState message="No locations found matching your criteria." />
+								<EmptyState message={isAiSearchActive ? "AI found no matching locations." : "No locations found."} description="Try adjusting your search or filters." />
 							)}
 						</div>
 					</div>
-					<div className="w-[40%] h-full relative">
+					{/* Right Column: Map View */}
+					<div className="w-[40%] h-full relative"> {/* Corrected width */}
+						{/* Search and Filters Overlay */}
 						<div className="absolute top-2 left-2 z-10 flex gap-2 items-center bg-white/80 backdrop-blur-sm p-1 rounded-lg shadow">
-							<SearchInput value={searchQuery} onChange={handleSearchChange} onClear={handleClearSearch} className="w-48" />
-							<Button variant="outline" size="sm" className="gap-1.5" onClick={() => setIsFilterModalOpen(true)}>
-								<Filter className="h-4 w-4" /> {/* Use lucide-react Filter */}
+							<SearchInput value={searchQuery} onChange={handleSearchChange} onClear={handleClearSearch} className="w-60" placeholder="Search or ask AI..." />
+							{/* AI Search Trigger Button */}
+							<Button
+								variant="outline"
+								size="sm"
+								className="gap-1.5"
+								onClick={handleAiSearch}
+								disabled={isAiSearchLoading || !searchQuery.trim()}
+								title="Search with AI"
+							>
+								{isAiSearchLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+								<span className="sr-only">AI Search</span>
+							</Button>
+							{/* Filter Button */}
+							<Button variant="outline" size="sm" className="gap-1.5 relative" onClick={() => setIsFilterModalOpen(true)}>
+								<Filter className="h-4 w-4" />
 								<span>Filters</span>
-								{filterCount > 0 && (
-									<span className="ml-1 rounded-full bg-primary text-primary-foreground px-2 py-0.5 text-xs">
+								{filterCount > 0 && !isAiSearchActive && ( // Hide badge if AI search is active
+									<span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">
 										{filterCount}
 									</span>
 								)}
 							</Button>
 						</div>
 						<MapView
-							locations={filteredLocations}
+							locations={filteredLocations} // Always show filtered locations on map
 							onLocationHover={handleLocationHover}
 							hoveredLocation={hoveredLocation}
 							onViewportChange={handleViewportChange}
