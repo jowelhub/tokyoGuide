@@ -11,12 +11,12 @@ import { useAuth } from '@/hooks/use-auth';
 import { useFavorites } from '@/hooks/use-favorites';
 import { HeartIcon as HeartSolid } from '@heroicons/react/24/solid';
 import { HeartIcon as HeartOutline, XMarkIcon as CloseIcon } from '@heroicons/react/24/outline';
-import InteractiveMapLayout from '@/components/map/interactive-map-layout'; // Import the new layout component
+import InteractiveMapLayout from '@/components/map/interactive-map-layout';
 import type { PopupContentProps } from '@/components/map-view';
 
-// Keep ExploreListView import
-const ExploreListView = dynamic(() => import("./explore-list-view"), {
-  ssr: false, // Ensure list view is also client-side if it uses hooks heavily
+// Import the consolidated LocationListView
+const LocationListView = dynamic(() => import("../location-list-view"), {
+  ssr: false,
   loading: () => <div className="h-full w-full flex items-center justify-center">Loading list...</div>,
 });
 
@@ -29,12 +29,13 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
   const { isLoggedIn } = useAuth();
   const { favorites: userFavorites, refreshFavorites: fetchFavorites, toggleFavorite, isFavorited, isLoading: isLoadingFavorite } = useFavorites();
 
-  // Function to render popup content for the Explore view
+  // Function to render popup content for the Explore view (remains the same)
   const renderExplorePopupContent = ({
     location,
     onClosePopup,
-  }: PopupContentProps) => { // Destructure only needed props
-    return (
+  }: PopupContentProps) => {
+    // ... (popup content rendering logic - no changes needed here)
+     return (
       <Link href={`/location/${location.id}`} target="_blank" className="block relative">
         <div className="airbnb-popup-close absolute right-2 top-2 bg-white rounded-full w-8 h-8 flex items-center justify-center z-10 cursor-pointer shadow-sm" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClosePopup(); }}>
           <CloseIcon className="w-5 h-5 text-gray-700" />
@@ -50,11 +51,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
                 if (isLoadingFavorite?.[location.id]) return;
                 const success = await toggleFavorite(location.id);
                 if (success) {
-                  await fetchFavorites(); // Refresh favorites state after toggle
-                  // If unfavorited and only showing favorites, close popup
-                  // Note: showOnlyFavorites state is managed inside InteractiveMapLayout now,
-                  // this logic might need adjustment or removal depending on exact UX desired.
-                  // For now, we keep the refresh. Closing logic might be complex to pass down.
+                  await fetchFavorites();
                 }
               }}
               title={isLoggedIn ? (isFavorited(location.id) ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}
@@ -72,18 +69,27 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
     );
   };
 
-  // Function to render the list view
+  // Function to render the list view using the new LocationListView
   const renderExploreListView = ({ locations, hoveredLocation, onLocationHover }: {
     locations: LocationData[];
     hoveredLocation: LocationData | null;
     onLocationHover: (location: LocationData | null) => void;
   }) => (
-    <ExploreListView
+    <LocationListView
       locations={locations}
       onLocationHover={onLocationHover}
       hoveredLocation={hoveredLocation}
-      refreshFavorites={fetchFavorites} // Pass down refresh function
-      userFavorites={userFavorites}     // Pass down current favorites
+      columns={3} // Explore uses 3 columns
+      // Pass down favorite props
+      isLoggedIn={isLoggedIn}
+      userFavorites={userFavorites}
+      isLoadingFavorite={isLoadingFavorite}
+      onToggleFavorite={toggleFavorite} // Pass the toggle function directly
+      // Pass link props
+      getCardHref={(loc) => `/location/${loc.id}`}
+      cardLinkTarget="_blank"
+      // No custom actions needed for explore cards
+      renderCardActions={undefined}
     />
   );
 
@@ -91,18 +97,18 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
     <InteractiveMapLayout
       initialLocations={initialLocations}
       categories={categories}
-      showSearchControls={true} // Show search/filter on map for desktop
-      showAiSearch={true}       // Enable AI search button
+      showSearchControls={true}
+      showAiSearch={true}
       showFilterControls={true}
       mobileNavViews={['map', 'list']}
       desktopLayoutConfig={{
-        listWidth: 'w-[60%]', // Explore: 60% List
-        mapWidth: 'w-[40%]',  // Explore: 40% Map
+        listWidth: 'w-[60%]',
+        mapWidth: 'w-[40%]',
         showPlanColumn: false,
       }}
       renderPopupContent={renderExplorePopupContent}
-      renderListView={renderExploreListView}
-      filterOptions={{ showDayFilter: false }} // No day filter in explore
+      renderListView={renderExploreListView} // Use the updated render function
+      filterOptions={{ showDayFilter: false }}
     />
   );
 }

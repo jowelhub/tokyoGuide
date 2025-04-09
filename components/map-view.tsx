@@ -215,10 +215,9 @@ export default function MapView({
         dragging={true}
         touchZoom={true}
         scrollWheelZoom={true}
-        doubleClickZoom={true}
+        doubleClickZoom={false}
         boxZoom={true}
         keyboard={true}
-        // tap={true} // REMOVED this line
       >
         <TileLayer
           attribution={MAP_CONFIG.attribution}
