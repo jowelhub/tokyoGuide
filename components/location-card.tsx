@@ -75,6 +75,7 @@ export default function LocationCard({
           alt={location.name}
           fill
           className="object-cover"
+          sizes="(min-width: 768px) 33vw, (min-width: 640px) 50vw, 100vw"
         />
       </div>
       
