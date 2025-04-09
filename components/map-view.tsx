@@ -84,8 +84,34 @@ function ViewportHandler({ locations, onViewportChange }: {
 // --- End ViewportHandler ---
 
 
-// --- MapBoundsController (Still commented out) ---
-// function MapBoundsController({ locationsToFit, onBoundsFitted }: { ... }) { ... }
+// --- MapBoundsController (RE-IMPLEMENTED) ---
+function MapBoundsController({ locationsToFit, onBoundsFitted }: {
+  locationsToFit: LocationData[] | null;
+  onBoundsFitted: () => void;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (locationsToFit && locationsToFit.length > 0 && map) {
+      console.log(`[MapBoundsController] Fitting bounds for ${locationsToFit.length} locations.`);
+      const validCoordinates = locationsToFit
+        .map(loc => loc.coordinates)
+        .filter((coord): coord is [number, number] => Array.isArray(coord) && coord.length === 2 && typeof coord[0] === 'number' && typeof coord[1] === 'number');
+
+      if (validCoordinates.length > 0) {
+        const bounds = L.latLngBounds(validCoordinates);
+        map.fitBounds(bounds, { padding: [50, 50] }); // Add padding for better UX
+        onBoundsFitted(); // Signal that fitting is done
+      } else {
+         console.warn('[MapBoundsController] No valid coordinates found in locationsToFit.');
+         onBoundsFitted(); // Still call this to reset the trigger
+      }
+    }
+  }, [locationsToFit, map, onBoundsFitted]); // Depend on locationsToFit and map
+
+  return null;
+}
+// --- End MapBoundsController ---
 
 // --- Interfaces ---
 export interface PopupContentProps {
@@ -106,8 +132,8 @@ export interface MapViewProps {
   onViewportChange: (locationsInViewport: LocationData[]) => void;
   refreshFavorites?: () => Promise<void>;
   renderPopupContent: (props: PopupContentProps) => React.ReactNode;
-  locationsToFit: LocationData[] | null;
-  onBoundsFitted: () => void;
+  locationsToFit: LocationData[] | null; // Prop needed for MapBoundsController
+  onBoundsFitted: () => void; // Prop needed for MapBoundsController
   locationToDayMap?: Map<string, number>;
 }
 
@@ -119,8 +145,8 @@ export default function MapView({
   onViewportChange,
   refreshFavorites,
   renderPopupContent,
-  locationsToFit, // Prop needed for MapBoundsController later
-  onBoundsFitted, // Prop needed for MapBoundsController later
+  locationsToFit, // Prop is received here
+  onBoundsFitted, // Prop is received here
   locationToDayMap,
 }: MapViewProps) {
   const [isMounted, setIsMounted] = useState(false);
@@ -221,7 +247,7 @@ export default function MapView({
               <Popup closeButton={false} autoPan={false} offset={[0, -23]}>
                 {renderPopupContent({
                   location,
-                  isLoggedIn: false,
+                  isLoggedIn: false, // These will be overridden by the parent's render function
                   isFavorited: () => false,
                   toggleFavorite: async () => false,
                   isLoadingFavorite: {},
@@ -238,8 +264,8 @@ export default function MapView({
         <ViewportHandler locations={locations} onViewportChange={onViewportChange} />
         {/* ------------------------------------------------- */}
 
-        {/* MapBoundsController is still removed */}
-        {/* <MapBoundsController locationsToFit={locationsToFit} onBoundsFitted={onBoundsFitted} /> */}
+        {/* MapBoundsController is NOW ACTIVE */}
+        <MapBoundsController locationsToFit={locationsToFit} onBoundsFitted={onBoundsFitted} />
 
         {/* CustomZoomControl is active */}
         <CustomZoomControl />
