@@ -1,7 +1,6 @@
-// components/map-view.tsx
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -46,7 +45,6 @@ function ViewportHandler({ locations, onViewportChange }: {
 }) {
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const DEBOUNCE_DELAY = 200;
-
   const map = useMapEvents({
     moveend: () => updateVisibleLocations(),
     zoomend: () => updateVisibleLocations(),
@@ -54,71 +52,58 @@ function ViewportHandler({ locations, onViewportChange }: {
   });
 
   const updateVisibleLocations = useCallback(() => {
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-
+    if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
     debounceTimeoutRef.current = setTimeout(() => {
       if (!map) return;
       const bounds = map.getBounds();
       const visibleLocations = locations.filter(location =>
-        location.coordinates && bounds.contains(location.coordinates)
+        location.coordinates && bounds.contains(L.latLng(location.coordinates))
       );
-      console.log(`[ViewportHandler Debounced] Updating visible locations: ${visibleLocations.length}`);
       onViewportChange(visibleLocations);
     }, DEBOUNCE_DELAY);
-
   }, [map, locations, onViewportChange]);
 
   useEffect(() => {
     updateVisibleLocations();
-    return () => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-    };
-  }, [locations, updateVisibleLocations]);
+    return () => { if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locations, map]);
 
   return null;
 }
-// --- End ViewportHandler ---
 
-
-// --- MapBoundsController (RE-IMPLEMENTED) ---
+// --- MapBoundsController ---
 function MapBoundsController({ locationsToFit, onBoundsFitted }: {
   locationsToFit: LocationData[] | null;
   onBoundsFitted: () => void;
 }) {
   const map = useMap();
-
   useEffect(() => {
     if (locationsToFit && locationsToFit.length > 0 && map) {
-      console.log(`[MapBoundsController] Fitting bounds for ${locationsToFit.length} locations.`);
       const validCoordinates = locationsToFit
         .map(loc => loc.coordinates)
         .filter((coord): coord is [number, number] => Array.isArray(coord) && coord.length === 2 && typeof coord[0] === 'number' && typeof coord[1] === 'number');
-
       if (validCoordinates.length > 0) {
         const bounds = L.latLngBounds(validCoordinates);
-        map.fitBounds(bounds, { padding: [50, 50] }); // Add padding for better UX
-        onBoundsFitted(); // Signal that fitting is done
+        if (map.getBoundsZoom(bounds) <= map.getZoom()) {
+            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+        }
+        onBoundsFitted();
       } else {
-         console.warn('[MapBoundsController] No valid coordinates found in locationsToFit.');
-         onBoundsFitted(); // Still call this to reset the trigger
+         onBoundsFitted();
       }
     }
-  }, [locationsToFit, map, onBoundsFitted]); // Depend on locationsToFit and map
-
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationsToFit, map]);
   return null;
 }
-// --- End MapBoundsController ---
 
 // --- Interfaces ---
 export interface PopupContentProps {
   location: LocationData;
   isLoggedIn: boolean;
   isFavorited: (locationId: string) => boolean;
-  toggleFavorite: (locationId: string) => Promise<boolean>;
+  toggleFavorite: (locationId: string) => Promise<boolean | void>;
   isLoadingFavorite: Record<string, boolean>;
   onAddToDay?: (location: LocationData) => void;
   onClosePopup: () => void;
@@ -132,8 +117,8 @@ export interface MapViewProps {
   onViewportChange: (locationsInViewport: LocationData[]) => void;
   refreshFavorites?: () => Promise<void>;
   renderPopupContent: (props: PopupContentProps) => React.ReactNode;
-  locationsToFit: LocationData[] | null; // Prop needed for MapBoundsController
-  onBoundsFitted: () => void; // Prop needed for MapBoundsController
+  locationsToFit: LocationData[] | null;
+  onBoundsFitted: () => void;
   locationToDayMap?: Map<string, number>;
 }
 
@@ -145,60 +130,45 @@ export default function MapView({
   onViewportChange,
   refreshFavorites,
   renderPopupContent,
-  locationsToFit, // Prop is received here
-  onBoundsFitted, // Prop is received here
+  locationsToFit,
+  onBoundsFitted,
   locationToDayMap,
 }: MapViewProps) {
   const [isMounted, setIsMounted] = useState(false);
   const popupRef = useRef<L.Popup | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
 
-  // --- Re-added icon generator ---
-  const generateInternalMarkerIcon = (isHovered: boolean, dayNumber?: number): L.DivIcon => {
+  const generateInternalMarkerIcon = useCallback((isHovered: boolean, dayNumber?: number): L.DivIcon => {
     const isPlanner = dayNumber !== undefined;
     const baseSize = MARKER_CONFIG.defaultSize;
     const size = isHovered ? Math.floor(baseSize * MARKER_CONFIG.highlightScale) : baseSize;
-
     let color: string;
-    if (isPlanner) {
-      color = isHovered ? MARKER_CONFIG.plannerHighlightColor : MARKER_CONFIG.plannerColor;
-    } else {
-      color = isHovered ? MARKER_CONFIG.defaultHighlightColor : MARKER_CONFIG.defaultColor;
-    }
-
+    if (isPlanner) color = isHovered ? MARKER_CONFIG.plannerHighlightColor : MARKER_CONFIG.plannerColor;
+    else color = isHovered ? MARKER_CONFIG.defaultHighlightColor : MARKER_CONFIG.defaultColor;
     const svgMarkup = createMarkerSvg(size, color, dayNumber);
-
     const iconAnchor: [number, number] = [size / 2, size * MARKER_CONFIG.anchorRatioY];
     const popupAnchor: [number, number] = [0, -size * 0.09];
     const tooltipAnchor: [number, number] = [0, -size * 0.73];
-
-    return new L.DivIcon({
-      html: svgMarkup,
-      className: isHovered ? 'custom-marker-icon-highlighted' : 'custom-marker-icon',
-      iconSize: [size, size],
-      iconAnchor,
-      popupAnchor,
-      tooltipAnchor
-    });
-  };
-  // --- End icon generator ---
+    return new L.DivIcon({ html: svgMarkup, className: isHovered ? 'custom-marker-icon-highlighted' : 'custom-marker-icon', iconSize: [size, size], iconAnchor, popupAnchor, tooltipAnchor });
+  }, []);
 
   useEffect(() => {
     setIsMounted(true);
     const styleEl = document.createElement('style');
     styleEl.textContent = customPopupStyles;
     document.head.appendChild(styleEl);
-    return () => {
-      styleEl.remove();
-    };
+    return () => { styleEl.remove(); };
   }, []);
 
-  // --- Re-added popup close handler ---
-  const handleClosePopup = () => {
+  const handleClosePopup = useCallback(() => {
     if (popupRef.current) {
-      popupRef.current.close(); // Use the public 'close' method
+        const map = mapRef.current;
+        if (map && map.hasLayer(popupRef.current)) {
+            map.closePopup(popupRef.current);
+        }
+        popupRef.current = null;
     }
-  };
-  // --- End popup close handler ---
+  }, []);
 
   if (!isMounted) {
     return <div className="h-full w-full bg-gray-100 flex items-center justify-center">Loading map...</div>;
@@ -211,46 +181,60 @@ export default function MapView({
         zoom={MAP_CONFIG.defaultZoom}
         style={{ height: "100%", width: "100%" }}
         zoomControl={false}
-        // Interactions re-enabled
         dragging={true}
         touchZoom={true}
         scrollWheelZoom={true}
         doubleClickZoom={false}
         boxZoom={true}
         keyboard={true}
+        ref={mapRef}
       >
         <TileLayer
           attribution={MAP_CONFIG.attribution}
           url={MAP_CONFIG.tileLayerUrl}
         />
 
-        {/* --- Marker Loop is active --- */}
+        {/* --- Marker Loop --- */}
         {locations.filter(loc => loc.coordinates && loc.coordinates.length === 2).map((location) => {
           const isHovered = hoveredLocation?.id === location.id;
           const dayNumber = locationToDayMap?.get(location.id);
-          const icon = generateInternalMarkerIcon(isHovered, dayNumber);
+          const icon = generateInternalMarkerIcon(isHovered, dayNumber); // Call directly
 
           return (
             <Marker
-              key={location.id}
+              key={location.id} // Key is crucial
               position={location.coordinates}
               icon={icon}
               eventHandlers={{
-                mouseover: () => onLocationHover(location),
-                mouseout: () => { if (hoveredLocation?.id === location.id) onLocationHover(null); },
-                popupopen: (e) => { popupRef.current = e.popup; },
-                popupclose: () => { popupRef.current = null; },
+                mouseover: (e) => {
+                    onLocationHover(location); // Set hover state on mouseover
+                },
+                mouseout: (e) => {
+                    // *** Always clear hover state when mouse leaves THIS marker ***
+                    onLocationHover(null);
+                },
+                popupopen: (e) => {
+                    popupRef.current = e.popup;
+                },
+                popupclose: (e) => {
+                    // *** Clear hover state if the closed popup matches the hovered location ***
+                    if (hoveredLocation?.id === location.id) {
+                        onLocationHover(null);
+                    }
+                    if (popupRef.current && e.popup && popupRef.current === e.popup) {
+                        popupRef.current = null;
+                    }
+                },
               }}
             >
-              {/* --- Popup is active --- */}
               <Popup closeButton={false} autoPan={false} offset={[0, -23]}>
                 {renderPopupContent({
                   location,
-                  isLoggedIn: false, // These will be overridden by the parent's render function
-                  isFavorited: () => false,
-                  toggleFavorite: async () => false,
-                  isLoadingFavorite: {},
-                  onClosePopup: handleClosePopup,
+                  isLoggedIn: false, // Placeholder, overridden by parent
+                  isFavorited: () => false, // Placeholder
+                  toggleFavorite: async () => {}, // Placeholder
+                  isLoadingFavorite: {}, // Placeholder
+                  onClosePopup: handleClosePopup, // Pass memoized handler
                   refreshFavorites
                 })}
               </Popup>
@@ -259,16 +243,9 @@ export default function MapView({
         })}
         {/* --- End Marker Loop --- */}
 
-        {/* --- ViewportHandler is active (with debounce) --- */}
         <ViewportHandler locations={locations} onViewportChange={onViewportChange} />
-        {/* ------------------------------------------------- */}
-
-        {/* MapBoundsController is NOW ACTIVE */}
         <MapBoundsController locationsToFit={locationsToFit} onBoundsFitted={onBoundsFitted} />
-
-        {/* CustomZoomControl is active */}
         <CustomZoomControl />
-
       </MapContainer>
     </div>
   );
