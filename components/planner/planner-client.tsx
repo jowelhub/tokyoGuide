@@ -11,24 +11,19 @@ import { useFavorites } from "@/hooks/use-favorites";
 import { useItinerary } from "@/hooks/use-itinerary";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { HeartIcon as HeartOutline, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { HeartIcon as HeartOutline, ExclamationTriangleIcon, XMarkIcon as CloseIcon } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartSolid, PlusIcon } from "@heroicons/react/24/solid";
 import DayItinerary from "@/components/planner/planner-day-itinerary";
 import EmptyState from "@/components/empty-state";
-import InteractiveMapLayout from "@/components/map/interactive-map-layout";
 import type { PopupContentProps } from '@/components/map-view';
-
-// Import the consolidated LocationListView
-const LocationListView = dynamic(() => import("../location-list-view"), {
-  ssr: false,
-  loading: () => <div className="h-full w-full flex items-center justify-center">Loading list...</div>,
-});
+import InteractiveMapLayout from '@/components/map/interactive-map-layout'; // Import the new layout
+import LocationListView from '@/components/location-list-view'; // Import the generic list view
 
 interface PlannerClientProps {
   itineraryId: number;
   initialItineraryData: ItineraryDay[];
   itineraryName: string;
-  initialLocations: LocationData[];
+  initialLocations: LocationData[]; // All available locations for the list/map
   categories: CategoryData[];
 }
 
@@ -40,8 +35,8 @@ export default function PlannerClient({
   categories
 }: PlannerClientProps) {
   // --- Hooks ---
-  const { isLoggedIn } = useAuth();
-  const { favorites: userFavorites, refreshFavorites: fetchFavorites, toggleFavorite, isFavorited, isLoading: isLoadingFavorite } = useFavorites();
+  const { isLoggedIn } = useAuth(); // Needed for conditional UI
+  const { favorites: userFavorites, refreshFavorites: fetchFavorites, toggleFavorite, isFavorited, isLoading: isLoadingFavorite } = useFavorites(); // Needed for list/popup
   const {
     days,
     addDay,
@@ -54,8 +49,7 @@ export default function PlannerClient({
   } = useItinerary(itineraryId, initialItineraryData);
 
   // --- State specific to Planner ---
-  const [selectedDayIds, setSelectedDayIds] = useState<number[]>([]);
-  const [selectedDayForPlanView, setSelectedDayForPlanView] = useState<number>(days[0]?.id || 1);
+  const [selectedDayIds, setSelectedDayIds] = useState<number[]>([]); // For filtering
   const [showDaySelectorModal, setShowDaySelectorModal] = useState<boolean>(false);
   const [locationToAdd, setLocationToAdd] = useState<LocationData | null>(null);
 
@@ -71,34 +65,38 @@ export default function PlannerClient({
   }, [days]);
 
   // --- Handlers specific to Planner ---
-  const handleDayFilterToggle = (dayId: number) => {
+  const handleDayFilterToggle = useCallback((dayId: number) => {
     setSelectedDayIds(prev => prev.includes(dayId) ? prev.filter(id => id !== dayId) : [...prev, dayId]);
-  };
-  const handleSelectDayForPlanView = (dayId: number) => {
-    setSelectedDayForPlanView(dayId);
-  };
-  const handleShowAddToDayModal = (location: LocationData) => {
+  }, []);
+
+  const handleShowAddToDayModal = useCallback((location: LocationData) => {
     setLocationToAdd(location);
     setShowDaySelectorModal(true);
-  };
-  const handleHideAddToDayModal = () => {
+  }, []);
+
+  const handleHideAddToDayModal = useCallback(() => {
     setShowDaySelectorModal(false);
     setLocationToAdd(null);
-  };
-  const handleAddLocationToSelectedDay = (dayId: number) => {
+  }, []);
+
+  const handleAddLocationToSelectedDay = useCallback((dayId: number) => {
     if (locationToAdd) {
       addLocationToDay(dayId, locationToAdd);
     }
     handleHideAddToDayModal();
-  };
+  }, [locationToAdd, addLocationToDay, handleHideAddToDayModal]);
 
   // --- Rendering Logic ---
 
-  // Popup content for map markers in Planner (remains the same)
-  const renderPlannerPopupContent = ({
-    location, onClosePopup
+  const renderPlannerPopupContent = useCallback(({
+    location,
+    onClosePopup,
+    // Props injected by InteractiveMapLayout's internal wrapper:
+    isLoggedIn: popupIsLoggedIn,
+    isFavorited: popupIsFavorited,
+    toggleFavorite: popupToggleFavorite,
+    isLoadingFavorite: popupIsLoadingFavorite,
   }: PopupContentProps) => {
-    // ... (popup content rendering logic - no changes needed here)
      return (
       <div className="airbnb-popup-content">
         {/* Image and Heart/Close Buttons */}
@@ -108,21 +106,20 @@ export default function PlannerClient({
             className="airbnb-popup-heart absolute left-2 top-2 bg-white rounded-full w-8 h-8 flex items-center justify-center z-10 cursor-pointer shadow-sm"
             onClick={async (e) => {
               e.preventDefault(); e.stopPropagation();
-              if (!isLoggedIn) { window.open('/login', '_blank'); return; }
-              if (isLoadingFavorite?.[location.id]) return;
-              const success = await toggleFavorite(location.id);
-              if (success) await fetchFavorites();
+              if (!popupIsLoggedIn) { window.open('/login', '_blank'); return; }
+              if (popupIsLoadingFavorite?.[location.id]) return;
+              await popupToggleFavorite(location.id);
             }}
-            title={isLoggedIn ? (isFavorited(location.id) ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}
+            title={popupIsLoggedIn ? (popupIsFavorited(location.id) ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}
           >
-            {isFavorited(location.id) ? <HeartSolid className="w-5 h-5 text-red-500" /> : <HeartOutline className="w-5 h-5 text-gray-700" />}
+            {popupIsFavorited(location.id) ? <HeartSolid className="w-5 h-5 text-red-500" /> : <HeartOutline className="w-5 h-5 text-gray-700" />}
           </div>
           <div
             className="absolute right-2 top-2 bg-white rounded-full w-8 h-8 flex items-center justify-center z-10 cursor-pointer shadow-sm"
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClosePopup(); }}
             title="Close"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-700"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+            <CloseIcon className="w-5 h-5 text-gray-700" />
           </div>
         </div>
         {/* Details Link */}
@@ -141,10 +138,10 @@ export default function PlannerClient({
         </div>
       </div>
     );
-  };
+  }, [isLoggedIn, isFavorited, toggleFavorite, isLoadingFavorite, handleShowAddToDayModal]); // Add planner-specific handler
 
   // Define the action button for the planner list view cards
-  const renderPlannerCardActions = (location: LocationData) => (
+  const renderPlannerCardActions = useCallback((location: LocationData) => (
     <button
       onClick={(e) => {
         e.preventDefault();
@@ -156,10 +153,10 @@ export default function PlannerClient({
       <PlusIcon className="w-4 h-4" />
       <span>Add to itinerary</span>
     </button>
-  );
+  ), [handleShowAddToDayModal]);
 
   // Function to render the list view using the new LocationListView
-  const renderPlannerListView = ({ locations, hoveredLocation, onLocationHover }: {
+  const renderPlannerListView = useCallback(({ locations, hoveredLocation, onLocationHover }: {
     locations: LocationData[];
     hoveredLocation: LocationData | null;
     onLocationHover: (location: LocationData | null) => void;
@@ -180,11 +177,10 @@ export default function PlannerClient({
       getCardHref={(loc) => `/location/${loc.id}`}
       cardLinkTarget="_blank"
     />
-  );
+  ), [isLoggedIn, userFavorites, isLoadingFavorite, toggleFavorite, renderPlannerCardActions]); // Add planner-specific action renderer
 
-  // Function to render the plan column view (remains the same)
-  const renderPlannerPlanView = () => (
-    // ... (plan view rendering logic - no changes needed here)
+  // Function to render the plan column view
+  const renderPlannerPlanView = useCallback(() => (
      <>
       <div className="p-3 bg-white border-b flex justify-between items-center sticky top-0 z-10">
         <h2 className="text-lg font-medium truncate pr-2">{itineraryName} {isSaving ? <span className="text-sm text-gray-500">(Saving...)</span> : ''}</h2>
@@ -205,8 +201,8 @@ export default function PlannerClient({
               <DayItinerary
                 key={day.id}
                 day={day}
-                isSelected={day.id === selectedDayForPlanView}
-                onSelect={() => handleSelectDayForPlanView(day.id)}
+                isSelected={false} // Plan column doesn't need selection highlight
+                onSelect={() => {}} // No action needed on select here
                 onRemove={() => removeDay(day.id)}
                 onRemoveLocation={(locationId) => removeLocationFromDay(day.id, locationId)}
               />
@@ -215,7 +211,7 @@ export default function PlannerClient({
         )}
       </div>
     </>
-  );
+  ), [itineraryName, isSaving, days, addDay, removeDay, removeLocationFromDay]); // Include all dependencies
 
   // --- Main Render ---
   if (isItineraryLoading) {
@@ -237,7 +233,6 @@ export default function PlannerClient({
     <div className="h-full flex flex-col">
       {/* --- Modals --- */}
       {showDaySelectorModal && locationToAdd && (
-        // ... (modal rendering logic - no changes needed here)
          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg p-6 max-w-sm w-full z-50">
             <h3 className="text-lg font-medium mb-4">Add "{locationToAdd.name}" to Day</h3>
@@ -263,9 +258,9 @@ export default function PlannerClient({
 
       {/* --- Main Layout --- */}
       <InteractiveMapLayout
-        initialLocations={initialLocations}
+        initialLocations={initialLocations} // Pass all available locations
         categories={categories}
-        showSearchControls={true}
+        showSearchControls={true} // Show controls above map on desktop
         showAiSearch={true}
         showFilterControls={true}
         mobileNavViews={['map', 'list', 'plan']}
@@ -275,16 +270,16 @@ export default function PlannerClient({
           listWidth: 'w-[30%]',
           mapWidth: 'w-[40%]',
         }}
-        renderPopupContent={renderPlannerPopupContent}
-        renderListView={renderPlannerListView} // Use the updated render function
-        renderPlanView={renderPlannerPlanView}
         filterOptions={{
           showDayFilter: true,
-          days: days,
-          selectedDayIds: selectedDayIds,
-          onDayToggle: handleDayFilterToggle,
+          days: days, // Pass current days from useItinerary
+          selectedDayIds: selectedDayIds, // Pass selected day IDs for filtering
+          onDayToggle: handleDayFilterToggle, // Pass the handler
         }}
-        locationToDayMap={locationToDayMap}
+        renderPopupContent={renderPlannerPopupContent}
+        renderListView={renderPlannerListView}
+        renderPlanView={renderPlannerPlanView}
+        locationToDayMap={locationToDayMap} // Pass the map for marker styling
       />
     </div>
   );
