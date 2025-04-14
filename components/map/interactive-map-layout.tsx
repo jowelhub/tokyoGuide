@@ -13,12 +13,12 @@ import MapControls from '@/components/map/map-controls';
 import MobileMapNav from '@/components/map/mobile-map-nav';
 import EmptyState from '@/components/empty-state';
 import { cn } from '@/lib/utils';
-import type { PopupContentProps } from '@/components/map-view'; // Assuming PopupContentProps is exported
+import type { PopupContentProps } from '@/components/map/map-view'; // Assuming PopupContentProps is exported
 import { Button } from '@/components/ui/button';
 import { XCircleIcon } from 'lucide-react';
 
 // Dynamically import MapView
-const MapView = dynamic(() => import("@/components/map-view"), {
+const MapView = dynamic(() => import("@/components/map/map-view"), {
   ssr: false,
   loading: () => <div className="h-full w-full bg-gray-100 flex items-center justify-center">Loading map...</div>,
 });

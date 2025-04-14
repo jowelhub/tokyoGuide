@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import SearchInput from '@/components/search-input';
+import SearchInput from '@/components/ui/search-input';
 import { Filter, Wand2, Loader2, XCircleIcon, SearchIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

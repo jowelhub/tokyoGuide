@@ -15,7 +15,7 @@ import { HeartIcon as HeartOutline, ExclamationTriangleIcon, XMarkIcon as CloseI
 import { HeartIcon as HeartSolid, PlusIcon } from "@heroicons/react/24/solid";
 import DayItinerary from "@/components/planner/planner-day-itinerary";
 import EmptyState from "@/components/empty-state";
-import type { PopupContentProps } from '@/components/map-view';
+import type { PopupContentProps } from '@/components/map/map-view';
 import InteractiveMapLayout from '@/components/map/interactive-map-layout'; // Import the new layout
 import LocationListView from '@/components/location-list-view'; // Import the generic list view
 

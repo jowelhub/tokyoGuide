@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useFavorites } from '@/hooks/use-favorites';
 import { HeartIcon as HeartSolid } from '@heroicons/react/24/solid';
 import { HeartIcon as HeartOutline, XMarkIcon as CloseIcon } from '@heroicons/react/24/outline';
-import type { PopupContentProps } from '@/components/map-view';
+import type { PopupContentProps } from '@/components/map/map-view';
 import InteractiveMapLayout from '@/components/map/interactive-map-layout'; // Import the new layout
 import LocationListView from '@/components/location-list-view'; // Import the generic list view
 
