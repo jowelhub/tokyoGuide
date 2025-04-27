@@ -51,7 +51,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
     const thisLocationIsFavorited = popupIsFavoritedCheck(location.id);
     const thisLocationIsLoadingFavorite = !!popupIsLoadingFavoriteMap[location.id];
     return (
-      <div className="w-[280px]">
+      <div className="w-[340px]">
         <LocationCardContent
           location={location}
           isLoggedIn={popupIsLoggedIn}
@@ -60,7 +60,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
           isLoadingFavorite={thisLocationIsLoadingFavorite}
           renderHeaderActions={renderCloseButton}
           renderFooterActions={undefined}
-          imageSizes="280px"
+          imageSizes="340px"
           linkHref={`/location/${location.id}`}
           linkTarget="_blank"
         />

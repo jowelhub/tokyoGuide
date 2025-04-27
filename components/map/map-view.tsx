@@ -11,8 +11,8 @@ import type { LocationData } from "@/lib/types";
 
 // --- Popup Styles ---
 const customPopupStyles = `
-  .leaflet-popup-content-wrapper { border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); background: white; }
-  .leaflet-popup-content { margin: 0; padding: 0; width: 280px !important; }
+  .leaflet-popup-content-wrapper { border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); background: white; min-width: 340px !important; max-width: 340px !important; }
+  .leaflet-popup-content { margin: 0; padding: 0; width: 340px !important; }
   .leaflet-popup-tip-container { display: none; }
   .airbnb-popup-content { overflow: hidden; border-radius: 8px; }
   .airbnb-popup-close { transition: background-color 0.2s; }

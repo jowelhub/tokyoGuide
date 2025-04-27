@@ -55,7 +55,7 @@ export default function LocationCardContent({
     // Add explicit font and color classes for consistency
     <div className={cn("flex flex-col h-full w-full text-foreground font-sans", className)}>
       {/* Image Section */}
-      <div className="relative w-full aspect-video flex-shrink-0">
+      <div className="relative w-full aspect-[16/9] flex-shrink-0">
         <Image
           src={location.images?.[0] || "/placeholder.svg"}
           alt={location.name}
