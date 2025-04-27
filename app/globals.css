@@ -106,3 +106,23 @@
   overflow: visible !important;
   filter: drop-shadow(0px 1px 1px rgba(0, 0, 0, 0.2));
 }
+
+/* Custom styles for map popups */
+.leaflet-popup-content-wrapper {
+  border-radius: 8px !important; /* Match the content's rounded corners */
+  padding: 0 !important; /* Remove wrapper padding */
+  background: white !important; /* Ensure background is white */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important; /* Add shadow */
+  overflow: hidden; /* Clip the image corners */
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+  padding: 0 !important; /* Content itself has no padding */
+  width: auto !important; /* Let the inner div define the width */
+  min-width: 280px; /* Set a minimum width if needed */
+}
+
+.leaflet-popup-tip-container {
+  display: none !important; /* Hide the default pointer tip */
+}
