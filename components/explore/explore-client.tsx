@@ -77,7 +77,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
       locations={locations}
       onLocationHover={onLocationHover}
       hoveredLocation={hoveredLocation}
-      columns={3}
+      columns={2}
       isLoggedIn={isLoggedIn}
       userFavorites={userFavorites}
       isLoadingFavorite={isLoadingFavoriteMap}
