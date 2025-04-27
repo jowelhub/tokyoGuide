@@ -4,6 +4,7 @@
 import type { LocationData } from "@/lib/types"
 // Corrected import path using alias
 import LocationCard from "@/components/location-card"
+import LocationCardContent from "@/components/location-card-content";
 import { cn } from "@/lib/utils"
 
 // Define the possible column counts
@@ -61,9 +62,7 @@ export default function LocationListView({
   listClassName,
   gridClassName
 }: LocationListViewProps) {
-
   const gridLayoutClasses = getGridClasses(columns);
-
   return (
     <div className={cn("h-full overflow-y-auto", listClassName)}>
       <div className={cn("p-4", gridClassName)}>
@@ -75,13 +74,11 @@ export default function LocationListView({
               isHovered={hoveredLocation?.id === location.id}
               onHoverStart={onLocationHover}
               onHoverEnd={() => onLocationHover(null)}
-              // Pass favorite props down
               isLoggedIn={isLoggedIn}
               isFavorited={userFavorites.includes(location.id)}
               onToggleFavorite={onToggleFavorite}
-              isLoadingFavorite={!!isLoadingFavorite[location.id]}
-              // Pass optional action/link props down
-              renderActions={renderCardActions}
+              isLoadingFavorite={isLoadingFavorite}
+              renderCardActions={renderCardActions}
               href={getCardHref ? getCardHref(location) : undefined}
               linkTarget={cardLinkTarget}
             />

@@ -9,10 +9,13 @@ import type { CategoryData } from '@/lib/supabase/categories';
 import { useAuth } from '@/hooks/use-auth';
 import { useFavorites } from '@/hooks/use-favorites';
 import { HeartIcon as HeartSolid } from '@heroicons/react/24/solid';
-import { HeartIcon as HeartOutline, XMarkIcon as CloseIcon } from '@heroicons/react/24/outline';
+import { HeartIcon as HeartOutline } from '@heroicons/react/24/outline';
 import type { PopupContentProps } from '@/components/map/map-view';
 import InteractiveMapLayout from '@/components/map/interactive-map-layout'; // Import the new layout
 import LocationListView from '@/components/location-list-view'; // Import the generic list view
+import LocationCardContent from "@/components/location-card-content";
+import { XMarkIcon as CloseIcon } from '@heroicons/react/24/outline';
+
 import { cn } from '@/lib/utils';
 
 interface ExploreClientProps {
@@ -21,87 +24,49 @@ interface ExploreClientProps {
 }
 
 export default function ExploreClient({ initialLocations, categories }: ExploreClientProps) {
-  const { isLoggedIn } = useAuth(); // Still needed for conditional UI in render functions
-  const { favorites: userFavorites, toggleFavorite, isFavorited, isLoading: isLoadingFavorite, refreshFavorites } = useFavorites(); // Needed for list/popup
+  const { isLoggedIn } = useAuth();
+  const { favorites: userFavorites, toggleFavorite, isFavorited, isLoading: isLoadingFavoriteMap } = useFavorites();
 
   // --- Rendering Functions for Explore ---
-
   const renderExplorePopupContent = useCallback(({ location, onClosePopup,
-    // Props injected by InteractiveMapLayout's internal wrapper:
     isLoggedIn: popupIsLoggedIn,
-    isFavorited: popupIsFavorited,
+    isFavorited: popupIsFavoritedCheck,
     toggleFavorite: popupToggleFavorite,
-    isLoadingFavorite: popupIsLoadingFavorite,
+    isLoadingFavorite: popupIsLoadingFavoriteMap,
   }: PopupContentProps) => {
-    // Click handler for the favorite button
-    const handleToggleFavoriteClick = async (e: React.MouseEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!popupIsLoggedIn) { window.open('/login', '_blank'); return; }
-      // Removed loading check to allow immediate clicking
-      await popupToggleFavorite(location.id);
-    };
-
-    // Click handler for the close button
-    const handleCloseClick = (e: React.MouseEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.stopPropagation(); // Prevent link navigation
-      onClosePopup();
-    };
-
-    return (
-      // Main container for the popup content - no border/bg needed here
-      // Leaflet's default popup wrapper provides the background and shadow
-      <div className="airbnb-popup-content w-[280px] overflow-hidden rounded-lg">
-        {/* Image Section */}
-        <div className="relative w-full aspect-video">
-          <Image
-            src={location.images[0] || "/placeholder.svg"}
-            alt={location.name}
-            fill
-            className="object-cover" // Image covers the container
-            sizes="(max-width: 768px) 100vw, 50vw"
-          />
-          {/* Favorite Button Overlay */}
-          <div
-            className="absolute left-2 top-2 z-10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white shadow-md transition-colors hover:bg-gray-100"
-            onClick={handleToggleFavoriteClick}
-            title={popupIsLoggedIn ? (popupIsFavorited(location.id) ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}
-            aria-label={popupIsFavorited(location.id) ? "Remove from favorites" : "Add to favorites"}
-          >
-            {popupIsFavorited(location.id) ? <HeartSolid className="w-5 h-5 text-red-500" /> : <HeartOutline className="w-5 h-5 text-gray-700" />}
-          </div>
-          {/* Close Button Overlay */}
-          <div
-            className="absolute right-2 top-2 z-10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white shadow-md transition-colors hover:bg-gray-100"
-            onClick={handleCloseClick}
-            title="Close"
-            aria-label="Close popup"
-          >
-            <CloseIcon className="w-5 h-5 text-gray-700" />
-          </div>
-        </div>
-
-        {/* Content Section - Wrapped in Link */}
-        <Link href={`/location/${location.id}`} target="_blank" className="block" onClick={(e) => {
-          // Prevent navigation if clicking on favorite/close buttons within the link area (though they are outside now)
-          if ((e.target as HTMLElement).closest('[aria-label*="favorite"]') || (e.target as HTMLElement).closest('[aria-label*="Close"]')) {
-            e.preventDefault();
-          }
-        }}>
-          <div className="p-3">
-            <h3 className="font-medium text-base truncate text-gray-900">{location.name}</h3>
-            <p className="text-sm text-gray-600 line-clamp-2 mt-1">{location.description}</p>
-            <div className="mt-2">
-              <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-800">
-                {location.category}
-              </span>
-            </div>
-          </div>
-        </Link>
+    const renderCloseButton = () => (
+      <div
+        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white shadow-md transition-colors hover:bg-gray-100"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClosePopup();
+        }}
+        title="Close"
+        aria-label="Close popup"
+      >
+        <CloseIcon className="w-5 h-5 text-gray-700" />
       </div>
     );
-  }, [isLoggedIn, isFavorited, toggleFavorite, isLoadingFavorite]); // Depend on hooks used directly
+    const thisLocationIsFavorited = popupIsFavoritedCheck(location.id);
+    const thisLocationIsLoadingFavorite = !!popupIsLoadingFavoriteMap[location.id];
+    return (
+      <div className="w-[280px]">
+        <LocationCardContent
+          location={location}
+          isLoggedIn={popupIsLoggedIn}
+          isFavorited={thisLocationIsFavorited}
+          onToggleFavorite={popupToggleFavorite}
+          isLoadingFavorite={thisLocationIsLoadingFavorite}
+          renderHeaderActions={renderCloseButton}
+          renderFooterActions={undefined}
+          imageSizes="280px"
+          linkHref={`/location/${location.id}`}
+          linkTarget="_blank"
+        />
+      </div>
+    );
+  }, []);
 
   const renderExploreListView = useCallback(({ locations, hoveredLocation, onLocationHover }: {
     locations: LocationData[];
@@ -112,42 +77,37 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
       locations={locations}
       onLocationHover={onLocationHover}
       hoveredLocation={hoveredLocation}
-      columns={3} // Explore uses 3 columns
-      // Pass down favorite props
+      columns={3}
       isLoggedIn={isLoggedIn}
       userFavorites={userFavorites}
-      isLoadingFavorite={isLoadingFavorite}
-      onToggleFavorite={toggleFavorite} // Pass the toggle function directly
-      // Pass link props
+      isLoadingFavorite={isLoadingFavoriteMap}
+      onToggleFavorite={toggleFavorite}
       getCardHref={(loc) => `/location/${loc.id}`}
       cardLinkTarget="_blank"
-      // No custom actions needed for explore cards
       renderCardActions={undefined}
     />
-  ), [isLoggedIn, userFavorites, isLoadingFavorite, toggleFavorite]); // Depend on hooks used directly
+  ), [isLoggedIn, userFavorites, isLoadingFavoriteMap, toggleFavorite]);
 
   // --- Render the Layout ---
   return (
     <InteractiveMapLayout
       initialLocations={initialLocations}
       categories={categories}
-      showSearchControls={true} // Show controls above map on desktop
+      showSearchControls={true}
       showAiSearch={true}
       showFilterControls={true}
       mobileNavViews={['map', 'list']}
       desktopLayoutConfig={{
         showPlanColumn: false,
-        listWidth: 'w-[60%]', // Explore list is wider
+        listWidth: 'w-[60%]',
         mapWidth: 'w-[40%]',
       }}
       filterOptions={{
-        showDayFilter: false, // No day filter in explore
+        showDayFilter: false,
       }}
       renderPopupContent={renderExplorePopupContent}
       renderListView={renderExploreListView}
-      // No plan view for explore
       renderPlanView={undefined}
-      // No day map for explore
       locationToDayMap={undefined}
     />
   );

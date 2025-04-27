@@ -10,9 +10,10 @@ import { useAuth } from "@/hooks/use-auth";
 import { useFavorites } from "@/hooks/use-favorites";
 import { useItinerary } from "@/hooks/use-itinerary";
 import Image from "next/image";
+import LocationCardContent from "@/components/location-card-content";
+import { HeartIcon as HeartOutline, ExclamationTriangleIcon, XMarkIcon as CloseIcon, PlusIcon } from "@heroicons/react/24/outline";
+import { HeartIcon as HeartSolid } from "@heroicons/react/24/solid";
 import { Button } from "@/components/ui/button";
-import { HeartIcon as HeartOutline, ExclamationTriangleIcon, XMarkIcon as CloseIcon } from "@heroicons/react/24/outline";
-import { HeartIcon as HeartSolid, PlusIcon } from "@heroicons/react/24/solid";
 import DayItinerary from "@/components/planner/planner-day-itinerary";
 import EmptyState from "@/components/empty-state";
 import type { PopupContentProps } from '@/components/map/map-view';
@@ -36,8 +37,8 @@ export default function PlannerClient({
   categories
 }: PlannerClientProps) {
   // --- Hooks ---
-  const { isLoggedIn } = useAuth(); // Needed for conditional UI
-  const { favorites: userFavorites, refreshFavorites: fetchFavorites, toggleFavorite, isFavorited, isLoading: isLoadingFavorite } = useFavorites(); // Needed for list/popup
+  const { isLoggedIn } = useAuth();
+  const { favorites: userFavorites, refreshFavorites: fetchFavorites, toggleFavorite, isFavorited, isLoading: isLoadingFavoriteMap } = useFavorites();
   const {
     days,
     addDay,
@@ -90,111 +91,69 @@ export default function PlannerClient({
   // --- Rendering Logic ---
 
   const renderPlannerPopupContent = useCallback(({ location, onClosePopup,
-    // Props injected by InteractiveMapLayout's internal wrapper:
     isLoggedIn: popupIsLoggedIn,
-    isFavorited: popupIsFavorited,
+    isFavorited: popupIsFavoritedCheck,
     toggleFavorite: popupToggleFavorite,
-    isLoadingFavorite: popupIsLoadingFavorite,
+    isLoadingFavorite: popupIsLoadingFavoriteMap,
   }: PopupContentProps) => {
-    // Click handler for the favorite button
-    const handleToggleFavoriteClick = async (e: React.MouseEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!popupIsLoggedIn) { window.open('/login', '_blank'); return; }
-      await popupToggleFavorite(location.id);
-    };
-
-    // Click handler for the close button
-    const handleCloseClick = (e: React.MouseEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
-      onClosePopup();
-    };
-
-    // Click handler for the "Add to itinerary" button
-    const handleAddClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
-      onClosePopup();
-      handleShowAddToDayModal(location);
-    };
-
-    return (
-      <div className="airbnb-popup-content w-[280px] overflow-hidden rounded-lg">
-        {/* Image Section */}
-        <div className="relative w-full aspect-video">
-          <Image
-            src={location.images[0] || "/placeholder.svg"}
-            alt={location.name}
-            fill
-            className="object-cover"
-            sizes="(max-width: 768px) 100vw, 50vw"
-          />
-          {/* Favorite Button Overlay */}
-          <div
-            className="absolute left-2 top-2 z-10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white shadow-md transition-colors hover:bg-gray-100"
-            onClick={handleToggleFavoriteClick}
-            title={popupIsLoggedIn ? (popupIsFavorited(location.id) ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}
-            aria-label={popupIsFavorited(location.id) ? "Remove from favorites" : "Add to favorites"}
-          >
-            {popupIsFavorited(location.id) ? <HeartSolid className="w-5 h-5 text-red-500" /> : <HeartOutline className="w-5 h-5 text-gray-700" />}
-          </div>
-          {/* Close Button Overlay */}
-          <div
-            className="absolute right-2 top-2 z-10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white shadow-md transition-colors hover:bg-gray-100"
-            onClick={handleCloseClick}
-            title="Close"
-            aria-label="Close popup"
-          >
-            <CloseIcon className="w-5 h-5 text-gray-700" />
-          </div>
-        </div>
-
-        {/* Content Section */}
-        <Link href={`/location/${location.id}`} target="_blank" className="block" onClick={(e) => {
-          if ((e.target as HTMLElement).closest('button')) {
-            e.preventDefault();
-          }
-        }}>
-          <div className="p-3">
-            <h3 className="font-medium text-base truncate text-gray-900">{location.name}</h3>
-            <p className="text-sm text-gray-600 line-clamp-2 mt-1">{location.description}</p>
-            <div className="mt-2">
-              <span className="inline-block px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-800">
-                {location.category}
-              </span>
-            </div>
-          </div>
-        </Link>
-
-        {/* Add to Itinerary Button */}
-        <div className="px-3 pb-3">
-          <Button
-            onClick={handleAddClick}
-            className="w-full flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg transition-colors text-sm"
-            size="sm"
-          >
-            <PlusIcon className="w-4 h-4" />
-            <span>Add to itinerary</span>
-          </Button>
-        </div>
+    const renderCloseButton = () => (
+      <div
+        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white shadow-md transition-colors hover:bg-gray-100"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClosePopup(); }}
+        title="Close" aria-label="Close popup"
+      >
+        <CloseIcon className="w-5 h-5 text-gray-700" />
       </div>
     );
-  }, [isLoggedIn, isFavorited, toggleFavorite, isLoadingFavorite, handleShowAddToDayModal]); // Add planner-specific handler
+    const renderAddButton = () => (
+      <Button
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClosePopup();
+          handleShowAddToDayModal(location);
+        }}
+        className="w-full flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg transition-colors text-sm"
+        size="sm"
+      >
+        <PlusIcon className="w-4 h-4" />
+        <span>Add to itinerary</span>
+      </Button>
+    );
+    const thisLocationIsFavorited = popupIsFavoritedCheck(location.id);
+    const thisLocationIsLoadingFavorite = !!popupIsLoadingFavoriteMap[location.id];
+    return (
+      <div className="w-[280px]">
+        <LocationCardContent
+          location={location}
+          isLoggedIn={popupIsLoggedIn}
+          isFavorited={thisLocationIsFavorited}
+          onToggleFavorite={popupToggleFavorite}
+          isLoadingFavorite={thisLocationIsLoadingFavorite}
+          renderHeaderActions={renderCloseButton}
+          renderFooterActions={renderAddButton}
+          imageSizes="280px"
+          linkHref={`/location/${location.id}`}
+          linkTarget="_blank"
+        />
+      </div>
+    );
+  }, [handleShowAddToDayModal]);
 
   // Define the action button for the planner list view cards
   const renderPlannerCardActions = useCallback((location: LocationData) => (
-    <button
+    <Button
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        handleShowAddToDayModal(location); // Use the handler from PlannerClient state
+        handleShowAddToDayModal(location);
       }}
-      className="mt-3 w-full flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg transition-colors text-sm"
+      className="w-full flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg transition-colors text-sm"
+      size="sm"
     >
       <PlusIcon className="w-4 h-4" />
       <span>Add to itinerary</span>
-    </button>
+    </Button>
   ), [handleShowAddToDayModal]);
 
   // Function to render the list view using the new LocationListView
@@ -211,15 +170,16 @@ export default function PlannerClient({
       // Pass down favorite props
       isLoggedIn={isLoggedIn}
       userFavorites={userFavorites}
-      isLoadingFavorite={isLoadingFavorite}
+      isLoadingFavorite={isLoadingFavoriteMap}
       onToggleFavorite={toggleFavorite}
       // Pass planner-specific action renderer
       renderCardActions={renderPlannerCardActions}
       // Pass link props
       getCardHref={(loc) => `/location/${loc.id}`}
       cardLinkTarget="_blank"
+      listClassName="bg-gray-50"
     />
-  ), [isLoggedIn, userFavorites, isLoadingFavorite, toggleFavorite, renderPlannerCardActions]); // Add planner-specific action renderer
+  ), [isLoggedIn, userFavorites, isLoadingFavoriteMap, toggleFavorite, renderPlannerCardActions]); // Add planner-specific action renderer
 
   // Function to render the plan column view
   const renderPlannerPlanView = useCallback(() => (
