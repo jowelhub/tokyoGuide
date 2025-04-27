@@ -36,12 +36,9 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
     // Click handler for the favorite button
     const handleToggleFavoriteClick = async (e: React.MouseEvent<HTMLDivElement>) => {
       e.preventDefault();
-      e.stopPropagation(); // Prevent link navigation
-      if (!popupIsLoggedIn) {
-        window.open('/login', '_blank');
-        return;
-      }
-      if (popupIsLoadingFavorite?.[location.id]) return;
+      e.stopPropagation();
+      if (!popupIsLoggedIn) { window.open('/login', '_blank'); return; }
+      // Removed loading check to allow immediate clicking
       await popupToggleFavorite(location.id);
     };
 
@@ -67,10 +64,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
           />
           {/* Favorite Button Overlay */}
           <div
-            className={cn(
-              "absolute left-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-md transition-colors hover:bg-white",
-              popupIsLoadingFavorite?.[location.id] ? "cursor-not-allowed opacity-70" : "cursor-pointer"
-            )}
+            className="absolute left-2 top-2 z-10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white shadow-md transition-colors hover:bg-gray-100"
             onClick={handleToggleFavoriteClick}
             title={popupIsLoggedIn ? (popupIsFavorited(location.id) ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}
             aria-label={popupIsFavorited(location.id) ? "Remove from favorites" : "Add to favorites"}
@@ -79,7 +73,7 @@ export default function ExploreClient({ initialLocations, categories }: ExploreC
           </div>
           {/* Close Button Overlay */}
           <div
-            className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-md transition-colors hover:bg-white cursor-pointer"
+            className="absolute right-2 top-2 z-10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white shadow-md transition-colors hover:bg-gray-100"
             onClick={handleCloseClick}
             title="Close"
             aria-label="Close popup"
